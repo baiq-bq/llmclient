@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "target": "ES2023", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "esModuleInterop": true, "skipLibCheck": true, "noUncheckedIndexedAccess": true, "declaration": true, "outDir": "dist" },
+  "include": ["src", "tests", "examples", "tsup.config.ts"]
+}

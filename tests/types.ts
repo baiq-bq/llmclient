@@ -1,0 +1,26 @@
+// These assertions are checked by tsc, not executed. An unused @ts-expect-error fails typecheck.
+import { createLlmClient, defineProvider, LanguageModel, ImageModel } from '../src/index.js';
+import { MockLanguageModelV4 } from 'ai/test';
+import { capabilities, messages } from './helpers.js';
+if (false) {
+  // @ts-expect-error default model typo
+  createLlmClient({ providers: [], defaults: { model: 'openai:gpt-typo' } });
+  const client = createLlmClient({ providers: [] });
+  client.generate({ model: LanguageModel.GPT6Astra, messages });
+  client.generateImage({ model: ImageModel.GPTImage2, prompt: 'test' });
+  // @ts-expect-error unknown language model
+  client.generate({ model: 'openai:gpt-typo', messages });
+  // @ts-expect-error image model cannot be used as a language model
+  client.generate({ model: ImageModel.GPTImage2, messages });
+  // @ts-expect-error language model cannot be used for image generation
+  client.generateImage({ model: LanguageModel.GPT6Astra, prompt: 'test' });
+  const external = defineProvider({ id: 'acme', models: { custom: { capabilities } }, resolveModel: () => new MockLanguageModelV4() });
+  const extensible = createLlmClient({ providers: [external] });
+  extensible.generate({ model: 'acme:custom', messages });
+  // @ts-expect-error custom model typo
+  extensible.generate({ model: 'acme:typo', messages });
+  const additional = createLlmClient({ providers: [], models: { 'acme:another': { capabilities } } });
+  additional.generate({ model: 'acme:another', messages });
+  // @ts-expect-error unregistered model
+  additional.generate({ model: 'acme:typo', messages });
+}

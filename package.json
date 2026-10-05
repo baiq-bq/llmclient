@@ -1,0 +1,121 @@
+{
+  "name": "@baiq/llmclient",
+  "version": "0.1.0",
+  "description": "Configurable multi-provider LLM client with usage accounting, pricing overrides, tools and streaming",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baiq-bq/llmclient.git"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./providers/openai": {
+      "import": {
+        "types": "./dist/providers/openai.d.ts",
+        "default": "./dist/providers/openai.js"
+      },
+      "require": {
+        "types": "./dist/providers/openai.d.cts",
+        "default": "./dist/providers/openai.cjs"
+      }
+    },
+    "./providers/anthropic": {
+      "import": {
+        "types": "./dist/providers/anthropic.d.ts",
+        "default": "./dist/providers/anthropic.js"
+      },
+      "require": {
+        "types": "./dist/providers/anthropic.d.cts",
+        "default": "./dist/providers/anthropic.cjs"
+      }
+    },
+    "./providers/google": {
+      "import": {
+        "types": "./dist/providers/google.d.ts",
+        "default": "./dist/providers/google.js"
+      },
+      "require": {
+        "types": "./dist/providers/google.d.cts",
+        "default": "./dist/providers/google.cjs"
+      }
+    },
+    "./providers/xai": {
+      "import": {
+        "types": "./dist/providers/xai.d.ts",
+        "default": "./dist/providers/xai.js"
+      },
+      "require": {
+        "types": "./dist/providers/xai.d.cts",
+        "default": "./dist/providers/xai.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "registry": "https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build && node scripts/smoke.mjs",
+    "prepack": "npm run build",
+    "publish:private": "node scripts/publish.mjs",
+    "check:private-install": "node scripts/install-check.mjs"
+  },
+  "dependencies": {
+    "ai": "7.0.127",
+    "zod": "^4.1.8"
+  },
+  "peerDependencies": {
+    "@ai-sdk/anthropic": "^4.0.71",
+    "@ai-sdk/google": "^4.0.87",
+    "@ai-sdk/openai": "^4.0.83",
+    "@ai-sdk/xai": "^5.0.14"
+  },
+  "peerDependenciesMeta": {
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
+      "optional": true
+    },
+    "@ai-sdk/xai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ai-sdk/anthropic": "4.0.71",
+    "@ai-sdk/google": "4.0.87",
+    "@ai-sdk/openai": "4.0.83",
+    "@ai-sdk/xai": "5.0.14",
+    "@types/node": "^24.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

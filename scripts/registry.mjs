@@ -11,6 +11,9 @@ export function run(command, args, options = {}) {
 /** The token is never printed, passed as a CLI argument, or stored in the checkout. */
 export function withRegistry(callback) {
   const token = run('gcloud', ['auth', 'print-access-token', '--project=baiq-459807'], { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' }).trim();
+  return withRegistryToken(token, callback);
+}
+export function withRegistryToken(token, callback) {
   if (!token || /\s/.test(token)) throw new Error('Invalid gcloud access token.');
   const directory = mkdtempSync(join(tmpdir(), 'baiq-npm-auth-'));
   const userconfig = join(directory, '.npmrc');

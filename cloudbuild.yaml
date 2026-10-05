@@ -1,0 +1,41 @@
+# Push trigger: ^main$ only. Unit tests are mandatory locally, never run here.
+steps:
+  - id: install
+    name: node:24-bookworm-slim
+    entrypoint: npm
+    args: ['ci', '--ignore-scripts', '--no-audit', '--no-fund']
+  - id: registry-token
+    name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        umask 077
+        gcloud auth print-access-token --project=baiq-459807 > /release-auth/token
+    volumes:
+      - name: release-auth
+        path: /release-auth
+  - id: version-gate
+    name: node:24-bookworm-slim
+    entrypoint: node
+    args: ['scripts/check-release.mjs']
+    env: ['LLMCLIENT_TOKEN_FILE=/release-auth/token']
+    volumes:
+      - name: release-auth
+        path: /release-auth
+  - id: types-and-package
+    name: node:24-bookworm-slim
+    entrypoint: npm
+    args: ['run', 'check:ci']
+  - id: publish
+    name: node:24-bookworm-slim
+    entrypoint: node
+    args: ['scripts/publish-ci.mjs']
+    env: ['LLMCLIENT_TOKEN_FILE=/release-auth/token']
+    volumes:
+      - name: release-auth
+        path: /release-auth
+serviceAccount: projects/baiq-459807/serviceAccounts/llmclient-publisher@baiq-459807.iam.gserviceaccount.com
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 600s

@@ -1,6 +1,6 @@
 {
   "name": "@baiq/llmclient",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Configurable multi-provider LLM client with usage accounting, pricing overrides, tools and streaming",
   "license": "UNLICENSED",
   "type": "module",
@@ -82,7 +82,9 @@
     "check": "npm run typecheck && npm test && npm run build && node scripts/smoke.mjs",
     "prepack": "npm run build",
     "publish:private": "node scripts/publish.mjs",
-    "check:private-install": "node scripts/install-check.mjs"
+    "check:private-install": "node scripts/install-check.mjs",
+    "check:ci": "npm run typecheck && npm run build && node scripts/smoke.mjs",
+    "check:release": "node scripts/check-release.mjs"
   },
   "dependencies": {
     "ai": "7.0.127",
@@ -114,6 +116,7 @@
     "@ai-sdk/openai": "4.0.83",
     "@ai-sdk/xai": "5.0.14",
     "@types/node": "^24.0.0",
+    "semver": "7.8.5",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

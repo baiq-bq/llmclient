@@ -503,6 +503,28 @@ Revisado el **2026-10-05**. Se incorporan las últimas familias disponibles de g
 
 Se excluyen endpoints de voz/Live, vídeo, embeddings, moderación, entrenamiento, multiagente alojado y ofertas especializadas con contrato de acceso/endpoint distinto. Los modelos retirados no se recomiendan. Para servicios especializados utiliza otro adaptador; este paquete no promete cubrir todos los endpoints de cada proveedor.
 
+## Cloud Build: publicación automática desde main
+
+Con el trigger de GitHub activado, cada push a `main` ejecuta `cloudbuild.yaml` mediante `llmclient-main-publish` de `baiq-459807`, región `europe-west1`. El pipeline instala dependencias, obtiene un token temporal, comprueba la versión, verifica tipos/build/imports y publica en el registro privado. **No ejecuta los tests unitarios**: son obligatorios en local antes de crear una PR y después del último cambio.
+
+La versión debe ser **mayor por precedencia SemVer que todas las versiones ya publicadas**, no solo distinta ni mayor que el dist-tag `latest`. `package.json` y las versiones raíz del lockfile deben coincidir. Una versión igual/inferior, credenciales inválidas o metadatos del registro no verificables hacen fallar el build; nunca se convierten en un skip exitoso. El gate se repite justo antes de publicar para detectar publicaciones concurrentes.
+
+Antes de crear cualquier PR, también si solo modifica documentación o CI:
+
+```bash
+git fetch origin main
+npm version patch --no-git-tag-version # minor/major si corresponde
+npm run check                         # tests obligatorios en local
+npm pack --dry-run --ignore-scripts
+npm run check:release -- --base origin/main
+```
+
+El último comando necesita acceso lector al registro y comprueba además que se haya incrementado respecto a la base de la PR. Si otra PR publica primero, actualiza la versión antes del merge. Un reintento del trigger sobre la misma versión publicada debe fallar. El trigger procesa el commit del evento de push; no publica por separado todos los commits intermedios enviados en un único push.
+
+La cuenta `llmclient-publisher@baiq-459807.iam.gserviceaccount.com` tiene writer únicamente sobre el repositorio npm y permiso de escritura de logs. No se entregan credenciales de publicación a builds de PR. La conexión dedicada `llmclient` usa la instalación existente de Cloud Build para `baiq-bq`; su credencial se guarda en Secret Manager y debe estar vigente. Con la conexión autorizada, `bash scripts/create-cloudbuild-trigger.sh` vincula el repositorio y crea el trigger sin cambiar las credenciales de ninguna conexión. No ejecutes ese script si el trigger ya existe; inspecciónalo con `gcloud builds triggers describe llmclient-main-publish --region=europe-west1 --project=baiq-459807`.
+
+Las [reglas del repositorio](https://github.com/baiq-bq/llmclient/blob/main/AGENTS.md) y la [skill de preparación/revisión de PRs](https://github.com/baiq-bq/llmclient/blob/main/.agents/skills/llmclient-pr-review/SKILL.md) exigen incremento de versión, pruebas locales y revisión de contratos, capacidades y costes. No publiques manualmente una versión que publicará el trigger del mismo commit; `publish:private` queda para operaciones manuales expresamente solicitadas.
+
 ## Desarrollo, comprobación y publicación
 
 ```bash
@@ -510,7 +532,7 @@ npm ci
 npm run check                 # tipos, pruebas HTTP simuladas, build y ESM/CommonJS
 npm pack --dry-run            # revisar contenido del paquete
 npm run publish:private      # comprueba y publica usando autenticación temporal
-npm run check:private-install # instala 0.1.0 en un proyecto temporal y comprueba imports
+npm run check:private-install # instala la versión de package.json en un proyecto temporal
 ```
 
 Las pruebas habituales no hacen llamadas de pago. Verifican payloads de los cuatro SDK, esquemas válidos/erróneos/truncados, capacidades, archivos, streaming, herramientas, caché, costes parciales, aislamiento, cancelación, plazo común y ausencia de ejecuciones duplicadas.

@@ -1,13 +1,14 @@
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { run, withRegistry } from './registry.mjs';
+const version = JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version;
 const directory = mkdtempSync(join(tmpdir(), 'baiq-llm-install-'));
 try {
   writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'private-install-check', private: true, type: 'module' }));
   withRegistry(env => {
-    run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@baiq/llmclient@0.1.0', '@ai-sdk/openai@4.0.83'], { cwd: directory, env });
+    run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', `@baiq/llmclient@${version}`, '@ai-sdk/openai@4.0.83'], { cwd: directory, env });
     const esm = `import {createLlmClient, LanguageModel, ImageModel} from '@baiq/llmclient'; import {openaiAdapter} from '@baiq/llmclient/providers/openai'; const client=createLlmClient({providers:[]}); const result=await client.generate({model:LanguageModel.Mock,messages:[{role:'user',content:'test'}]}); if(result.cost.estimatedUsd!==0 || typeof openaiAdapter!=='function' || !ImageModel.GPTImage25Sunburst) throw Error('Invalid package'); console.log('Private ESM installation passed');`;
     writeFileSync(join(directory, 'verify.mjs'), esm);
     run('node', ['verify.mjs'], { cwd: directory, env });

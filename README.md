@@ -153,7 +153,7 @@ console.log(extracted.object);
 // También incluye text, messages, usage, cost y entries como generate().
 ```
 
-El objeto final debe satisfacer Zod. Una respuesta inválida, filtrada o truncada devuelve un error propio y conserva el consumo conocido. Con la política predeterminada se permiten tres intentos en total; desde el tercero se añade una instrucción de reparación para objetos inválidos.
+El objeto final debe satisfacer Zod. Una respuesta inválida, filtrada o truncada devuelve un error propio y conserva el consumo conocido. Con la política predeterminada se permiten tres intentos en total; desde el segundo se añade una instrucción de reparación con los campos y códigos de validación que fallaron. `retries.repairFromAttempt` permite cambiar ese umbral.
 
 ## Streaming de texto y objetos
 
@@ -379,6 +379,14 @@ console.log(quote.entries);     // consumo acumulado de todos los pasos
 ```
 
 `maxSteps` limita pasos del modelo, no el número de herramientas paralelas dentro de un paso. Cada herramienta debe tener esquema, descripción y `execute`; las herramientas gestionadas por el proveedor y las que requieren aprobación no están habilitadas. El plazo incluye herramientas y esperas. Tras ejecutar una herramienta no se reintenta la operación completa, para evitar duplicar efectos. Una dependencia que ignore `AbortSignal` puede seguir trabajando fuera del cliente: propaga la señal y diseña los efectos de la herramienta para ser idempotentes.
+
+## Diagnóstico y reparación de objetos
+
+`llmclient` valida siempre el objeto completo con el esquema Zod original, incluidas sus transformaciones y reglas adicionales. Para OpenAI selecciona `strictJsonSchema: true` antes de llamar cuando el esquema tiene forma compatible: objeto raíz, campos obligatorios, objetos cerrados y límites soportados. Es conservador con referencias recursivas, mapas dinámicos, campos opcionales, formatos no admitidos y modelos fine-tuned; en esos casos selecciona `false` y conserva la validación Zod. La elección explícita en `providerOptions.openai.strictJsonSchema` prevalece. No transforma el contrato, cambia de modelo ni prueba otro modo tras un rechazo del proveedor. Véase [Structured Outputs de OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs).
+
+Los errores de objetos incluyen `error.structuredOutput`; los intentos rechazados conservan el mismo diagnóstico en `accounting.entries[].structuredOutput`. Contiene clase de fallo (`json_parse`, `schema_validation`, `truncated`, `no_output` o `unknown`), hasta 20 códigos/rutas de validación, número de incidencias omitidas, motivo de finalización cuando se conoce y longitud de salida. No contiene valores recibidos, mensajes personalizados de validadores, claves dinámicas, prompts ni cuerpos del proveedor. Las rutas dinámicas aparecen como `<key>` y los mensajes son descripciones seguras del cliente. Si el SDK no proporciona detalles, el diagnóstico lo indica; no se infiere un campo culpable.
+
+Desde el segundo intento se envían esos diagnósticos al mismo modelo. Una salida previa completa solo se utiliza como contexto si cabe en `retries.maxRepairCharacters` (32000 por defecto); una salida demasiado grande o marcada como truncada se omite entera. Nunca se envía un prefijo de JSON cortado. Se mantienen el plazo único, los dos reintentos máximos predeterminados y la contabilidad de todos los intentos. Esto mejora la reparación estructural; la corrección del contenido sigue siendo responsabilidad de la revisión del agente consumidor.
 
 ## Tarifas parciales, ceros y tramos de contexto
 

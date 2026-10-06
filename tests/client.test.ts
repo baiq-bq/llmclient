@@ -28,9 +28,9 @@ describe('client lifecycle', () => {
     const error = await createLlmClient({ providers: [adapter(model)], retries: { maxRetries: 0 } }).generate({ model: 'external:test', messages }).catch(e => e);
     expect(error).toBeInstanceOf(LlmError); expect(error.accounting.attemptCount).toBe(1); expect(JSON.stringify(error)).not.toMatch(/secret|private|accounting/); expect(error.cause).toBeUndefined();
   });
-  it('repairs invalid objects on attempt 3 and sums usage', async () => {
+  it('honours an explicit repair threshold of attempt 3 and sums usage', async () => {
     const model = new MockLanguageModelV4({ doGenerate: [generated('{"other":1}'), generated('{"other":1}'), generated('{"title":"ok"}')] });
-    const result = await createLlmClient({ providers: [adapter(model)], pricing, retries: retryFast }).generateObject({ model: 'external:test', messages }, { schema: z.object({ title: z.string() }) });
+    const result = await createLlmClient({ providers: [adapter(model)], pricing, retries: { ...retryFast, repairFromAttempt: 3 } }).generateObject({ model: 'external:test', messages }, { schema: z.object({ title: z.string() }) });
     expect(result.object).toEqual({ title: 'ok' }); expect(result.attemptCount).toBe(3); expect(result.usage.inputTokens).toBe(300);
     expect(JSON.stringify(model.doGenerateCalls[1]!.prompt)).not.toContain('previous response');
     expect(JSON.stringify(model.doGenerateCalls[2]!.prompt)).toContain('previous response');

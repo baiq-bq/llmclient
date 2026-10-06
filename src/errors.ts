@@ -1,4 +1,4 @@
-import type { Accounting, CompatibilityDetails } from './types.js';
+import type { Accounting, CompatibilityDetails, StructuredOutputDiagnostics } from './types.js';
 export type LlmErrorCode = 'INVALID_CONFIGURATION' | 'INVALID_REQUEST' | 'PROVIDER_NOT_CONFIGURED' | 'UNSUPPORTED_CAPABILITY' | 'PROVIDER_ERROR' | 'STRUCTURED_OUTPUT_ERROR' | 'TRUNCATED_OUTPUT' | 'CONTENT_FILTERED' | 'TOOL_ERROR' | 'TIMEOUT' | 'ABORTED';
 const messages: Record<LlmErrorCode, string> = {
   INVALID_CONFIGURATION: 'Invalid LLM client configuration.', INVALID_REQUEST: 'Invalid LLM request.',
@@ -14,10 +14,12 @@ export class LlmError extends Error {
   readonly details?: CompatibilityDetails;
   readonly retryable: boolean;
   readonly retryAfterMs?: number;
+  readonly structuredOutput?: StructuredOutputDiagnostics;
   declare readonly accounting?: Accounting;
-  constructor(code: LlmErrorCode, options: { upstreamStatus?: number; retryable?: boolean; retryAfterMs?: number; accounting?: Accounting; details?: CompatibilityDetails } = {}) {
+  constructor(code: LlmErrorCode, options: { upstreamStatus?: number; retryable?: boolean; retryAfterMs?: number; accounting?: Accounting; details?: CompatibilityDetails; structuredOutput?: StructuredOutputDiagnostics } = {}) {
     super(messages[code]); this.details = options.details; this.name = 'LlmError'; this.code = code;
     this.upstreamStatus = options.upstreamStatus; this.retryable = options.retryable ?? false; this.retryAfterMs = options.retryAfterMs;
+    if (options.structuredOutput) this.structuredOutput = structuredClone(options.structuredOutput);
     if (options.accounting) Object.defineProperty(this, 'accounting', { value: options.accounting, enumerable: false });
   }
 }

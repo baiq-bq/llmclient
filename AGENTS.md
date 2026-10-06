@@ -16,7 +16,7 @@ Estas instrucciones se aplican a todo el repositorio. Para preparar o revisar un
 - Enviar archivos directamente; no extraer ni convertir PDF/DOCX automáticamente, no cambiar de modelo a escondidas. La compatibilidad depende del modelo y de la ruta implementada por el adaptador.
 - Los objetos solo son válidos tras validar el resultado final con Zod. Un fragmento de streaming no es un objeto válido.
 - Herramientas con descripción/esquema/execute, máximo predeterminado de cinco pasos. No repetir una operación después de ejecutar herramientas o emitir eventos. Propagar AbortSignal a las dependencias.
-- Un solo plazo incluye llamadas, backoff y herramientas. SDK con `maxRetries: 0`; política propia con dos reintentos por defecto y reparación de objetos desde el tercer intento.
+- Un solo plazo incluye llamadas, backoff y herramientas. SDK con `maxRetries: 0`; política propia con dos reintentos por defecto y reparación de objetos desde el segundo intento.
 - Conservar consumo conocido de intentos/pasos anteriores, incluso al fallar. No registrar secretos, prompts, respuestas o cuerpos privados automáticamente.
 
 ## Modelos y costes

@@ -1,7 +1,7 @@
 import { APICallError, NoObjectGeneratedError, NoOutputGeneratedError } from 'ai';
 import { LlmError } from './errors.js';
 import type { RetryPolicy } from './types.js';
-export const defaultRetryPolicy: Readonly<RetryPolicy> = Object.freeze({ maxRetries: 2, repairFromAttempt: 3, maxRepairCharacters: 32_000, baseDelayMs: 500, maxDelayMs: 10_000 });
+export const defaultRetryPolicy: Readonly<RetryPolicy> = Object.freeze({ maxRetries: 2, repairFromAttempt: 2, maxRepairCharacters: 32_000, baseDelayMs: 500, maxDelayMs: 10_000 });
 export class Budget {
   private controller = new AbortController();
   private timer: ReturnType<typeof setTimeout>;

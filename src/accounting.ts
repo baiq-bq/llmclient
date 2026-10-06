@@ -1,5 +1,5 @@
 import type { LanguageModelUsage } from 'ai';
-import type { Accounting, AccountingEntry, ModelId, Usage } from './types.js';
+import type { Accounting, AccountingEntry, ModelId, Usage, StructuredOutputDiagnostics } from './types.js';
 import { calculateCost, type ResolvedPricing } from './pricing.js';
 
 function count(n: number | undefined) { return n !== undefined && Number.isSafeInteger(n) && n >= 0 ? n : undefined; }
@@ -24,6 +24,9 @@ export class Ledger {
     if (!this.active) return;
     this.active.usage = Object.fromEntries(Object.entries(usage).map(([k, v]) => [k, count(v)]));
     this.active.cost = calculateCost(this.pricing, this.active.usage);
+  }
+  diagnose(value: StructuredOutputDiagnostics) {
+    if (this.active) this.active.structuredOutput = structuredClone(value);
   }
   snapshot(): Accounting {
     const usage: Usage = {};

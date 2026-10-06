@@ -13,7 +13,7 @@ description: Prepara y revisa PRs de @baiq/llmclient; verifica incremento obliga
    - Tipos/autocompletado de modelos de texto e imagen, extensibilidad externa e imports ESM/CommonJS con peers opcionales.
    - Capacidades verificadas por modelo; archivos directos y rechazo antes de I/O con alternativas estructuradas; sin conversión/fallback automático.
    - Objetos finales validados; streaming con cancelación y sin reinicios tras emitir eventos; herramientas sin efectos duplicados y límite de pasos.
-   - Plazo global, maxRetries SDK=0, backoff/Retry-After, reparación a partir del tercer intento y consumo conservado al fallar.
+   - Plazo global, maxRetries SDK=0, backoff/Retry-After, reparación a partir del segundo intento y consumo conservado al fallar.
    - Merge parcial de tarifas por campo/tramo, ceros válidos, caché separada, reasoning no duplicado, coste desconocido/parcial honesto y aislamiento entre clientes.
    - `mock` local de coste cero, sin red ni herramientas; documentación y ejemplos actualizados, fuentes oficiales para nuevos modelos/precios.
 7. Si cambia publicación, revisa el destino privado fijado, gate estricto contra todas las versiones, lockfile consistente, revalidación antes de publicar, errores de red/auth propagados, permisos mínimos por repositorio y ausencia de tokens en logs/tarball. No publicar desde una PR ni saltar el gate con un éxito ficticio.

@@ -89,6 +89,22 @@ export interface AccountingEntry {
   step: number;
   usage: Usage;
   cost: Cost;
+  /** Safe validation metadata only; never contains output text or provider bodies. */
+  structuredOutput?: StructuredOutputDiagnostics;
+}
+export interface StructuredOutputIssue {
+  code: string;
+  path: (string | number)[];
+  /** Generated from the issue code, never copied from a custom validator message. */
+  message: string;
+}
+export interface StructuredOutputDiagnostics {
+  kind: 'json_parse' | 'schema_validation' | 'no_output' | 'truncated' | 'unknown';
+  issues: StructuredOutputIssue[];
+  omittedIssueCount: number;
+  finishReason?: string;
+  outputCharacters?: number;
+  repairContext: 'complete_output' | 'omitted_oversized_output' | 'omitted_truncated_output' | 'unavailable';
 }
 export interface Accounting {
   /** Provider invocations, including unsuccessful calls without reported usage. */

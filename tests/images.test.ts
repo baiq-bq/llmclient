@@ -24,6 +24,18 @@ describe('image generation', () => {
     const result = await createLlmClient({ providers: [xaiAdapter({ apiKey: 'synthetic' })], fetch: send }).generateImage({ model: ImageModel.GrokImagineImage2, prompt: 'test', n: 2 });
     expect(result.images).toHaveLength(2); expect(Buffer.from(result.images[0]!.bytes)).toEqual(png); expect(result.cost).toMatchObject({ status: 'known', estimatedUsd: 0.08 }); expect(result.attemptCount).toBe(2); expect(body.resolution).toBe('1k'); expect(body.quality).toBe('low');
   });
+  it('generates and edits Nano Banana 2.1 through the native Google SDK', async () => {
+    let body: any; let url: string;
+    const send = vi.fn<typeof fetch>(async (input, init) => {
+      url = String(input); body = JSON.parse(String(init?.body));
+      return Response.json({ candidates: [{ content: { role: 'model', parts: [{ inlineData: { mimeType: 'image/png', data: png.toString('base64') } }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 100, totalTokenCount: 110 } });
+    });
+    const result = await createLlmClient({ providers: [googleAdapter({ apiKey: 'synthetic' })], fetch: send }).generateImage({ model: ImageModel.GeminiNanoBanana21, prompt: 'Edit this image', aspectRatio: '16:9', files: [{ bytes: png, mediaType: 'image/png' }] });
+    expect(url!).toContain('gemini-nano-banana-2.1:generateContent');
+    expect(body.generationConfig.imageConfig.aspectRatio).toBe('16:9');
+    expect(body.contents[0].parts).toContainEqual({ inlineData: { mimeType: 'image/png', data: png.toString('base64') } });
+    expect(Buffer.from(result.images[0]!.bytes)).toEqual(png); expect(result.cost.status).toBe('unknown');
+  });
   it('prices reference images and sends edits to xAI', async () => {
     let body: any; let url: string;
     const send = vi.fn<typeof fetch>(async (input, init) => { url = String(input); body = JSON.parse(String(init?.body)); return Response.json({ data: [{ b64_json: png.toString('base64') }] }); });

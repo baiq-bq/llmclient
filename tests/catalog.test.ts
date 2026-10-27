@@ -4,7 +4,8 @@ import { openaiAdapter } from '../src/providers/openai.js';
 import { anthropicAdapter } from '../src/providers/anthropic.js';
 import { googleAdapter } from '../src/providers/google.js';
 import { xaiAdapter } from '../src/providers/xai.js';
-const adapters = [openaiAdapter({ apiKey: 'synthetic' }), anthropicAdapter({ apiKey: 'synthetic' }), googleAdapter({ apiKey: 'synthetic' }), xaiAdapter({ apiKey: 'synthetic' })];
+import { deepseekAdapter } from '../src/providers/deepseek.js';
+const adapters = [openaiAdapter({ apiKey: 'synthetic' }), anthropicAdapter({ apiKey: 'synthetic' }), googleAdapter({ apiKey: 'synthetic' }), xaiAdapter({ apiKey: 'synthetic' }), deepseekAdapter({ apiKey: 'synthetic' })];
 const messages = [{ role: 'user' as const, content: 'test' }];
 describe('verified catalog transport compatibility', () => {
   it('keeps exported identifiers and adapter catalogs synchronized', () => {
@@ -13,7 +14,7 @@ describe('verified catalog transport compatibility', () => {
     for (const adapter of adapters) {
       expect(Object.keys(adapter.models!).map(id => `${adapter.id}:${id}`).sort()).toEqual(Object.keys(modelCatalog).filter(id => id.startsWith(`${adapter.id}:`)).sort());
     }
-    for (const model of Object.keys(modelCatalog)) expect(defaultPricing[model as keyof typeof defaultPricing]).toHaveProperty('version', '2026-10-05');
+    for (const model of Object.keys(modelCatalog)) expect(defaultPricing[model as keyof typeof defaultPricing]).toHaveProperty('version', '2026-10-27');
   });
   it.each(builtinLanguageModels.filter(id => id !== 'mock'))('sends the exact language model ID for %s', async model => {
     let body: any; let url: string;
@@ -35,6 +36,9 @@ describe('verified catalog transport compatibility', () => {
       if (effort === 'none') expect(body.thinking.type).toBe('disabled');
       else if (model !== LanguageModel.ClaudeHaiku45) expect(body.output_config.effort).toBe(effort);
       else expect(body.thinking.type).toBe('enabled');
+    } else if (model.startsWith('deepseek:')) {
+      expect(body.thinking.type).toBe(effort === 'none' ? 'disabled' : 'enabled');
+      expect(body.reasoning_effort).toBe(effort === 'none' ? undefined : effort);
     } else expect(body.reasoning.effort).toBe(effort);
   });
   it.each(builtinImageModels.filter(id => id !== 'mock'))('sends the exact image model ID for %s', async model => {
@@ -49,6 +53,9 @@ describe('verified catalog transport compatibility', () => {
   it('rejects always-on thinking and unsupported xAI formats before transport', async () => {
     const send = vi.fn<typeof fetch>(); const client = createLlmClient({ providers: adapters, fetch: send });
     await expect(client.generate({ model: LanguageModel.ClaudeOpus55, messages, reasoning: { effort: 'none' } })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    // Terra's API accepts none, but the installed SDK drops it: reject before I/O.
+    await expect(client.generate({ model: LanguageModel.GPT61Terra, messages, reasoning: { effort: 'none' } })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    await expect(client.generate({ model: LanguageModel.Gemini4Argon, messages, maxOutputTokens: 65_537 })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
     await expect(client.generate({ model: LanguageModel.Grok47, messages, images: [{ bytes: Buffer.from('synthetic'), mediaType: 'image/webp' }] })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
     expect(send).not.toHaveBeenCalled();
   });

@@ -1,6 +1,6 @@
 {
   "name": "@baiq/llmclient",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Configurable multi-provider LLM client with usage accounting, pricing overrides, tools and streaming",
   "license": "UNLICENSED",
   "type": "module",
@@ -70,7 +70,17 @@
         "default": "./dist/providers/xai.cjs"
       }
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./providers/deepseek": {
+      "import": {
+        "types": "./dist/providers/deepseek.d.ts",
+        "default": "./dist/providers/deepseek.js"
+      },
+      "require": {
+        "types": "./dist/providers/deepseek.d.cts",
+        "default": "./dist/providers/deepseek.cjs"
+      }
+    }
   },
   "publishConfig": {
     "registry": "https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/"
@@ -87,11 +97,12 @@
     "check:release": "node scripts/check-release.mjs"
   },
   "dependencies": {
-    "ai": "7.0.127",
+    "ai": "7.0.154",
     "zod": "^4.1.8"
   },
   "peerDependencies": {
     "@ai-sdk/anthropic": "^4.0.71",
+    "@ai-sdk/deepseek": "^3.0.74",
     "@ai-sdk/google": "^4.0.87",
     "@ai-sdk/openai": "^4.0.83",
     "@ai-sdk/xai": "^5.0.14"
@@ -108,10 +119,14 @@
     },
     "@ai-sdk/xai": {
       "optional": true
+    },
+    "@ai-sdk/deepseek": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "4.0.71",
+    "@ai-sdk/deepseek": "3.0.74",
     "@ai-sdk/google": "4.0.87",
     "@ai-sdk/openai": "4.0.83",
     "@ai-sdk/xai": "5.0.14",

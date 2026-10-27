@@ -4,6 +4,16 @@ import type { Usage } from '../src/index.js';
 const usage: Usage = { inputTokens: 1_000_000, uncachedInputTokens: 700_000, cachedInputTokens: 200_000, cacheWriteTokens: 100_000, outputTokens: 100_000, reasoningTokens: 50_000 };
 const id = LanguageModel.ClaudeSonnet5;
 describe('pricing', () => {
+  it.each([
+    [LanguageModel.GPT61Terra, 272_000, 1, 5, 0.05, 1.25],
+    [LanguageModel.GPT61Terra, 272_001, 2, 7.5, 0.1, 2.5],
+    [LanguageModel.ClaudeHaiku55, 100_000, 0.1, 0.5, 0.01, 0.125],
+    [LanguageModel.ClaudeHaiku55, 100_001, 0.5, 2.5, 0.05, 0.625],
+    [LanguageModel.Gemini4Argon, 500_000, 2, 10, 0.1, undefined],
+  ] as const)('uses documented rates for %s at %i input tokens', (model, inputTokens, input, output, cachedInput, cacheWrite) => {
+    const cost = calculateCost(resolvePricing(defaultPricing).get(model), { ...usage, inputTokens });
+    expect(cost.appliedPricing.rates).toEqual({ input, output, cachedInput, ...(cacheWrite !== undefined ? { cacheWrite } : {}) });
+  });
   it('separates normal input, read/write cache and output without charging reasoning twice', () => {
     const result = calculateCost(resolvePricing(defaultPricing).get(id), usage);
     expect(result.estimatedUsd).toBeCloseTo(2.69); expect(result.status).toBe('known');

@@ -1,6 +1,6 @@
 # @baiq/llmclient
 
-Cliente TypeScript para backend **Node.js ≥24**, basado en AI SDK. Unifica texto, objetos validados, streaming, herramientas y generación/edición de imágenes. Incluye adaptadores para OpenAI, Anthropic, Google Gemini y xAI, un modelo `mock` sin red ni coste, y registro de proveedores/modelos externos.
+Cliente TypeScript para backend **Node.js ≥24**, basado en AI SDK. Unifica texto, objetos validados, streaming, herramientas y generación/edición de imágenes. Incluye adaptadores para OpenAI, Anthropic, Google Gemini, xAI y DeepSeek, un modelo `mock` sin red ni coste, y registro de proveedores/modelos externos.
 
 Puedes instalar el mismo paquete en tantos proyectos como necesites, incluso fuera de Google Cloud. Cada aplicación necesita acceso lector al registro para instalar; después, solo usa las credenciales del proveedor que configure.
 
@@ -32,6 +32,7 @@ El token caduca aproximadamente en una hora. En CI utiliza identidad federada o 
 npm install @ai-sdk/anthropic   # adaptador Anthropic
 npm install @ai-sdk/google      # adaptador Google
 npm install @ai-sdk/xai         # adaptador xAI
+npm install @ai-sdk/deepseek    # adaptador DeepSeek
 ```
 
 Disponibles entradas ESM y CommonJS con declaraciones TypeScript. Las subrutas de proveedores evitan cargar SDK que no utilices.
@@ -44,6 +45,7 @@ import { openaiAdapter } from '@baiq/llmclient/providers/openai';
 import { anthropicAdapter } from '@baiq/llmclient/providers/anthropic';
 import { googleAdapter } from '@baiq/llmclient/providers/google';
 import { xaiAdapter } from '@baiq/llmclient/providers/xai';
+import { deepseekAdapter } from '@baiq/llmclient/providers/deepseek';
 
 // Las credenciales las obtiene TU aplicación; el paquete siempre las recibe explícitamente.
 const client = createLlmClient({
@@ -52,6 +54,7 @@ const client = createLlmClient({
     anthropicAdapter({ apiKey: process.env.ANTHROPIC_API_KEY! }),
     googleAdapter({ apiKey: process.env.GOOGLE_API_KEY! }),
     xaiAdapter({ apiKey: process.env.XAI_API_KEY! }),
+    deepseekAdapter({ apiKey: process.env.DEEPSEEK_API_KEY! }),
   ],
   defaults: {
     model: LanguageModel.GPT61Sol,
@@ -124,7 +127,7 @@ Forma de respuesta (ejemplo ilustrativo; texto y consumo reales varían):
         rates: { input: 2, output: 10, cachedInput: 0.1, cacheWrite: 2.5 },
         origins: { input: 'internal', output: 'internal', cachedInput: 'internal', cacheWrite: 'internal' },
         context: 'standard',
-        source: 'https://developers.openai.com/api/docs/pricing', version: '2026-10-05',
+        source: 'https://developers.openai.com/api/docs/pricing', version: '2026-10-27',
       },
     },
   }],
@@ -132,6 +135,43 @@ Forma de respuesta (ejemplo ilustrativo; texto y consumo reales varían):
 ```
 
 `reasoningTokens` forma parte de `outputTokens`: **no se vuelve a cobrar**. Los campos de consumo ausentes permanecen ausentes. `attemptCount` cuenta llamadas reales al proveedor, incluidas las de herramientas y los intentos fallidos; no es el número de reintentos.
+
+## DeepSeek: texto, JSON, streaming y herramientas
+
+Instala el peer opcional `@ai-sdk/deepseek` e importa `deepseekAdapter` desde `@baiq/llmclient/providers/deepseek`. La aplicación pasa su clave explícitamente; no hace falta instalar el SDK de OpenAI. Se usa Chat Completions nativo (`https://api.deepseek.com/chat/completions`), que conserva `reasoning_content` en las conversaciones y pasos de herramientas. `baseURL`, `headers` y `fetch` son configurables como en los demás adaptadores.
+
+```ts
+const deepseek = createLlmClient({
+  providers: [deepseekAdapter({ apiKey: process.env.DEEPSEEK_API_KEY! })],
+});
+const answer = await deepseek.generate({
+  model: LanguageModel.DeepSeekFlash,
+  messages: [{ role: 'user', content: 'Explica cómo funciona una caché.' }],
+  reasoning: { effort: 'high' },
+});
+console.log(answer.text, answer.usage);
+```
+
+Los esfuerzos canónicos son `none`, `low`, `high` y `max`; `none` desactiva thinking y el proveedor usa `high` si se omite. No se admiten presupuestos de reasoning ni se remapean esfuerzos a escondidas. El límite de salida es 393.216 tokens, incluido reasoning. El paquete no expone temperatura para estos modelos porque se ignora con el thinking predeterminado. El adaptador usa `@ai-sdk/deepseek` ≥3.0.74 y el núcleo AI SDK 7.0.154; consulta también el [contrato del SDK nativo](https://ai-sdk.dev/providers/ai-sdk-providers/deepseek). Flash admite PNG, JPEG, WebP y GIF en bytes, con los límites conservadores del paquete. Ambos rechazan PDF/DOCX antes de I/O y no generan imágenes.
+
+`generateObject` y el streaming de objetos usan `response_format: { type: 'json_object' }`. El SDK añade una instrucción JSON con el esquema; la validación final Zod y la reparación siguen siendo responsabilidad del cliente. DeepSeek no recibe `json_schema` estricto en este endpoint estable. El SDK nativo también devuelve reasoning en los eventos del streaming y lo conserva al continuar herramientas.
+
+**Costes:** DeepSeek cambia sus tarifas según horas punta y festivos chinos. El catálogo conserva fuente y fecha, pero devuelve coste `unknown` sin una tarifa explícita. En USD por millón de tokens, Flash cuesta input/caché/output **0,15/0,003/0,60** fuera de punta y **0,30/0,006/1,20** en punta; Pro cuesta **0,66/0,022/1,98** fuera de punta y **1,32/0,044/3,96** en punta. Las horas punta son 01:00–04:00 y 06:00–10:00 UTC de lunes a viernes, excluidos festivos chinos. La aplicación debe elegir la tarifa correspondiente a cada operación; un cliente no cambia de tarifa automáticamente:
+
+```ts
+const offPeak = createLlmClient({
+  providers: [deepseekAdapter({ apiKey: process.env.DEEPSEEK_API_KEY! })],
+  pricing: {
+    [LanguageModel.DeepSeekFlash]: {
+      rates: { input: 0.15, cachedInput: 0.003, output: 0.6 },
+      source: 'https://api-docs.deepseek.com/quick_start/pricing/',
+      version: '2026-10-27-off-peak',
+    },
+  },
+});
+```
+
+Se conserva la entrada cacheada por separado y el reasoning ya incluido en output no se vuelve a facturar. El consumo ausente permanece desconocido aunque el SDK rellene campos con cero.
 
 ## Extraer un objeto validado
 
@@ -282,7 +322,7 @@ Límites del paquete: normalmente 10 archivos de hasta 5 MiB y 20 MiB totales pa
 
 ## Generar imágenes
 
-OpenAI, Google y xAI tienen modelos de generación de imágenes. **Anthropic no ofrece uno**; sus modelos Claude analizan imágenes de entrada.
+OpenAI, Google y xAI tienen modelos de generación de imágenes. **Anthropic y DeepSeek no ofrecen uno en este catálogo**; sus modelos Claude analizan imágenes de entrada.
 
 ```ts
 const illustration = await client.generateImage({
@@ -397,7 +437,7 @@ const priced = createLlmClient({
     [LanguageModel.GPT61Sol]: {
       rates: { input: 1.8, cachedInput: 0 }, // output/cacheWrite heredan la tabla interna
       longContext: { rates: { input: 3.6, cachedInput: 0 } },
-      source: 'Contrato de mi organización', version: '2026-10-05',
+      source: 'Contrato de mi organización', version: '2026-10-27',
     },
   },
 });
@@ -413,7 +453,7 @@ const imageClient = createLlmClient({
   pricing: {
     [ImageModel.Gemini31FlashImage]: {
       rates: { image: 0.08, inputImage: 0.002 },
-      source: 'Estimación interna para imágenes 1K', version: '2026-10-05',
+      source: 'Estimación interna para imágenes 1K', version: '2026-10-27',
     },
   },
 });
@@ -423,7 +463,7 @@ Esta tarifa cubre la llamada completa; no se suman además sus tokens. Ajusta tu
 
 `cost.status` es `known`, `partial` o `unknown`. `estimatedUsd` es el subtotal conocido; `null` significa que no se conoce ningún componente facturable. Una llamada fallida sin consumo reportado impide presentar la factura total como completa. `entries[].cost.missing` explica qué falta y `appliedPricing.origins` indica `internal`/`custom` por campo. Caché de lectura se descuenta de la entrada normal; caché de escritura se cobra aparte cuando se reporta.
 
-Las tarifas internas son una instantánea de **2026-10-05** de procesamiento estándar/global bajo demanda. No incluyen impuestos, almacenamiento de caché, herramientas alojadas, descuentos Batch/Flex ni recargos regionales/Priority/Fast. Anthropic usa escritura de caché de cinco minutos; si seleccionas una hora, debes sobrescribir esa tarifa. Google 3.8/3.7/3.6 tiene precios introductorios hasta 2026-12-31: actualiza la tabla para operaciones posteriores. No hay descubrimiento automático de precios ni modelos al arrancar.
+Las tarifas internas son una instantánea de **2026-10-27** de procesamiento estándar/global bajo demanda. No incluyen impuestos, almacenamiento de caché, herramientas alojadas, descuentos Batch/Flex ni recargos regionales/Priority/Fast. Anthropic usa escritura de caché de cinco minutos; si seleccionas una hora, debes sobrescribir esa tarifa. Gemini 4 Argon usa precios introductorios hasta 2026-11-30: desde 2026-12-01, input/output/caché pasan de 2/10/0,10 a 4/20/0,20 USD por millón. Google 3.8/3.7/3.6 tiene precios introductorios hasta 2026-12-31: actualiza la tabla para operaciones posteriores. No hay descubrimiento automático de precios ni modelos al arrancar.
 
 ## Modelo mock: desarrollo sin credenciales ni coste
 
@@ -502,12 +542,14 @@ Dos reintentos por defecto, con backoff y respeto de `Retry-After`. Los reintent
 
 ## Catálogo y fuentes oficiales
 
-Revisado el **2026-10-05**. Se incorporan las últimas familias disponibles de generación de texto e imagen; también se mantienen alternativas activas. El catálogo es estático, tipado y ampliable. La presencia de un modelo no otorga acceso a una cuenta restringida ni convierte un preview en estable.
+Actualización de modelos contrastada el **2026-10-27**. Las nuevas capacidades y tarifas se verifican en las páginas enlazadas de cada proveedor. Gemini 4 Argon se limita a 65.536 tokens de salida síncrona: su long decode de hasta 1M requiere otro flujo. GPT‑6.1 Terra admite `low`, `medium`, `high`, `xhigh` y `max` en este paquete; `none` se rechaza porque el SDK lo descarta, aunque la API lo admite. Nano Banana 2.1 mantiene los límites conservadores de referencias de imagen del paquete. Se incorporan las últimas familias disponibles de generación de texto e imagen; también se mantienen alternativas activas. El catálogo es estático, tipado y ampliable. La presencia de un modelo no otorga acceso a una cuenta restringida ni convierte un preview en estable.
 
-- **OpenAI texto:** `GPT6Astra`, `GPT61Sol`, `GPT6Luna`. Imagen: `GPTImage25Sunburst`, `GPTImage25Flare`, `GPTImage2`. [Catálogo](https://developers.openai.com/api/docs/models), [precios](https://developers.openai.com/api/docs/pricing), [archivos](https://developers.openai.com/api/docs/guides/file-inputs).
-- **Anthropic texto:** `ClaudeFable51`, `ClaudeMythos51` (acceso restringido), `ClaudeOpus55`, `ClaudeSonnet55`, `ClaudeHaiku45`; alternativas `ClaudeOpus5` y `ClaudeSonnet5`. No tiene generación de imágenes. [Modelos](https://platform.claude.com/docs/en/models/overview), [precios](https://platform.claude.com/docs/en/about-claude/pricing), [reasoning](https://platform.claude.com/docs/en/build-with-claude/effort).
-- **Google texto:** `Gemini38Flash`, `Gemini37Flash`, `Gemini36Flash`, `Gemini35Flash`, `Gemini35FlashLite`, `Gemini31FlashLite`, `Gemini31ProPreview`, `Gemini3FlashPreview`. Imagen: `Gemini31FlashImage`, `Gemini31FlashLiteImage`, `Gemini3ProImage`; también el identificador anterior `Gemini31FlashImagePreview` para compatibilidad. [Modelos](https://ai.google.dev/gemini-api/docs/models), [precios](https://ai.google.dev/gemini-api/docs/pricing), [imágenes](https://ai.google.dev/gemini-api/docs/image-generation).
+- **OpenAI texto:** `GPT6Astra`, `GPT61Sol`, `GPT61Terra`, `GPT6Luna`. Imagen: `GPTImage25Sunburst`, `GPTImage25Flare`, `GPTImage2`. [Catálogo](https://developers.openai.com/api/docs/models), [precios](https://developers.openai.com/api/docs/pricing), [archivos](https://developers.openai.com/api/docs/guides/file-inputs).
+- **Anthropic texto:** `ClaudeFable51`, `ClaudeMythos51` (acceso restringido), `ClaudeOpus55`, `ClaudeSonnet55`, `ClaudeHaiku55`; alternativas `ClaudeHaiku45`, `ClaudeOpus5` y `ClaudeSonnet5`. No tiene generación de imágenes. [Modelos](https://platform.claude.com/docs/en/models/overview), [precios](https://platform.claude.com/docs/en/about-claude/pricing), [reasoning](https://platform.claude.com/docs/en/build-with-claude/effort).
+- **Google texto:** `Gemini4Argon`, `Gemini38Flash`, `Gemini37Flash`, `Gemini36Flash`, `Gemini35Flash`, `Gemini35FlashLite`, `Gemini31FlashLite`, `Gemini31ProPreview`, `Gemini3FlashPreview`. Imagen: `GeminiNanoBanana21`, `Gemini31FlashImage`, `Gemini31FlashLiteImage`, `Gemini3ProImage`; también el identificador anterior `Gemini31FlashImagePreview` para compatibilidad. [Modelos](https://ai.google.dev/gemini-api/docs/models), [precios](https://ai.google.dev/gemini-api/docs/pricing), [imágenes](https://ai.google.dev/gemini-api/docs/image-generation).
 - **xAI texto:** `Grok47`, `GrokBuild01`, `Grok46`, `Grok45`, `Grok43`, `Grok420Reasoning`, `Grok420NonReasoning`. Imagen: `GrokImagineImage2`, `GrokImagineImage`, `GrokImagineImageQuality` (retirada anunciada para 2026-11-02). Texto admite PNG/JPEG; las referencias de imagen de generación siguen su propio contrato. [Modelos](https://docs.x.ai/developers/models), [precios](https://docs.x.ai/developers/pricing).
+
+- **DeepSeek texto:** `DeepSeekFlash` (`deepseek-flash`, versión V4.1-Flash-1017) y `DeepSeekV4Pro` (`deepseek-v4-pro`, versión V4-Pro-0813). Flash admite imágenes; Pro solo texto. Los alias retirados `deepseek-chat`, `deepseek-reasoner` y `deepseek-v4-flash` no se añaden al catálogo. [Modelos y tarifas](https://api-docs.deepseek.com/quick_start/pricing/), [razonamiento](https://api-docs.deepseek.com/guides/thinking_mode/), [visión](https://api-docs.deepseek.com/guides/vision/), [JSON](https://api-docs.deepseek.com/guides/json_mode/), [herramientas](https://api-docs.deepseek.com/guides/thinking_mode/#tool-calls).
 
 Se excluyen endpoints de voz/Live, vídeo, embeddings, moderación, entrenamiento, multiagente alojado y ofertas especializadas con contrato de acceso/endpoint distinto. Los modelos retirados no se recomiendan. Para servicios especializados utiliza otro adaptador; este paquete no promete cubrir todos los endpoints de cada proveedor.
 

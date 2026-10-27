@@ -7,6 +7,15 @@ if (false) {
   createLlmClient({ providers: [], defaults: { model: 'openai:gpt-typo' } });
   const client = createLlmClient({ providers: [] });
   client.generate({ model: LanguageModel.GPT6Astra, messages });
+  client.generate({ model: LanguageModel.DeepSeekFlash, messages });
+  client.generate({ model: LanguageModel.GPT61Terra, messages });
+  client.generate({ model: LanguageModel.ClaudeHaiku55, messages });
+  client.generate({ model: LanguageModel.Gemini4Argon, messages });
+  client.generateImage({ model: ImageModel.GeminiNanoBanana21, prompt: 'test' });
+  // @ts-expect-error DeepSeek typo must not become an arbitrary string
+  client.generate({ model: 'deepseek:deepseek-flahs', messages });
+  // @ts-expect-error DeepSeek is a language model, not an image generator
+  client.generateImage({ model: LanguageModel.DeepSeekFlash, prompt: 'test' });
   client.generateImage({ model: ImageModel.GPTImage2, prompt: 'test' });
   // @ts-expect-error unknown language model
   client.generate({ model: 'openai:gpt-typo', messages });

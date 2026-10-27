@@ -5,6 +5,7 @@ import { createLlmClient, ImageModel, LanguageModel, LlmError, tool } from '../s
 import { openaiAdapter } from '../src/providers/openai.js';
 import { googleAdapter } from '../src/providers/google.js';
 import { deepseekAdapter } from '../src/providers/deepseek.js';
+import { kimiAdapter } from '../src/providers/kimi.js';
 export async function examples(keys: { openai: string; google: string }) {
   const client = createLlmClient({ providers: [openaiAdapter({ apiKey: keys.openai }), googleAdapter({ apiKey: keys.google })], defaults: { model: LanguageModel.GPT61Sol } });
   const messages = [{ role: 'user' as const, content: 'Resume el archivo.' }];
@@ -29,6 +30,15 @@ export async function deepseekExample(apiKey: string) {
   const messages = [{ role: 'user' as const, content: 'Clasifica este libro.' }];
   const result = await client.generateObject({ model: LanguageModel.DeepSeekFlash, messages, reasoning: { effort: 'high' } }, { schema: z.object({ title: z.string() }) });
   const stream = client.stream({ model: LanguageModel.DeepSeekV4Pro, messages });
+  for await (const event of stream.events) if (event.type === 'text-delta') process.stdout.write(event.text);
+  return { result, final: await stream.result };
+}
+
+export async function kimiExample(apiKey: string) {
+  const client = createLlmClient({ providers: [kimiAdapter({ apiKey })] });
+  const messages = [{ role: 'user' as const, content: 'Clasifica este libro.' }];
+  const result = await client.generateObject({ model: LanguageModel.KimiK31Pro, messages, reasoning: { effort: 'high' } }, { schema: z.object({ title: z.string() }) });
+  const stream = client.stream({ model: LanguageModel.KimiK31ProHighspeed, messages, reasoning: { effort: 'low' } });
   for await (const event of stream.events) if (event.type === 'text-delta') process.stdout.write(event.text);
   return { result, final: await stream.result };
 }

@@ -6,10 +6,12 @@ import { anthropicAdapter } from '../src/providers/anthropic.js';
 import { googleAdapter } from '../src/providers/google.js';
 import { xaiAdapter } from '../src/providers/xai.js';
 import { deepseekAdapter } from '../src/providers/deepseek.js';
+import { kimiAdapter } from '../src/providers/kimi.js';
 import { messages } from './helpers.js';
-const models = [LanguageModel.GPT6Astra, LanguageModel.ClaudeSonnet5, LanguageModel.Gemini38Flash, LanguageModel.Grok46, LanguageModel.GPT61Terra, LanguageModel.ClaudeHaiku55, LanguageModel.Gemini4Argon, LanguageModel.DeepSeekFlash, LanguageModel.DeepSeekV4Pro] as const;
-function client(transport: typeof fetch) { return createLlmClient({ providers: [openaiAdapter({ apiKey: 'synthetic' }), anthropicAdapter({ apiKey: 'synthetic' }), googleAdapter({ apiKey: 'synthetic' }), xaiAdapter({ apiKey: 'synthetic' }), deepseekAdapter({ apiKey: 'synthetic' })], fetch: transport, retries: { maxRetries: 0, baseDelayMs: 0 } }); }
+const models = [LanguageModel.GPT6Astra, LanguageModel.ClaudeSonnet5, LanguageModel.Gemini38Flash, LanguageModel.Grok46, LanguageModel.GPT61Terra, LanguageModel.ClaudeHaiku55, LanguageModel.Gemini4Argon, LanguageModel.DeepSeekFlash, LanguageModel.DeepSeekV4Pro, LanguageModel.KimiK31Pro, LanguageModel.KimiK31ProHighspeed, LanguageModel.KimiK3] as const;
+function client(transport: typeof fetch) { return createLlmClient({ providers: [openaiAdapter({ apiKey: 'synthetic' }), anthropicAdapter({ apiKey: 'synthetic' }), googleAdapter({ apiKey: 'synthetic' }), xaiAdapter({ apiKey: 'synthetic' }), deepseekAdapter({ apiKey: 'synthetic' }), kimiAdapter({ apiKey: 'synthetic' })], fetch: transport, retries: { maxRetries: 0, baseDelayMs: 0 } }); }
 function response(model: BuiltinLanguageModel, text: string, kind: 'valid' | 'length' | 'filter' = 'valid') {
+  if (model.startsWith('kimi:')) return { id: 'chat-1', object: 'chat.completion', created: 1, model: model.slice('kimi:'.length), choices: [{ index: 0, message: { role: 'assistant', content: text, reasoning_content: 'Synthetic reasoning' }, finish_reason: kind === 'length' ? 'length' : kind === 'filter' ? 'content_filter' : 'stop' }], usage: { prompt_tokens: 100, completion_tokens: 30, total_tokens: 130, prompt_tokens_details: { cached_tokens: 10, cache_write_tokens: 20 }, completion_tokens_details: { reasoning_tokens: 10 } } };
   if (model.startsWith('deepseek:')) return { id: 'chat-1', object: 'chat.completion', created: 1, model: model.slice('deepseek:'.length), choices: [{ index: 0, message: { role: 'assistant', content: text, reasoning_content: 'Synthetic reasoning' }, finish_reason: kind === 'length' ? 'length' : kind === 'filter' ? 'content_filter' : 'stop' }], usage: { prompt_tokens: 100, completion_tokens: 30, total_tokens: 130, prompt_cache_hit_tokens: 10, prompt_cache_miss_tokens: 90, completion_tokens_details: { reasoning_tokens: 10 } } };
   if (model.startsWith('google:')) return { candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason: kind === 'length' ? 'MAX_TOKENS' : kind === 'filter' ? 'SAFETY' : 'STOP' }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 20, thoughtsTokenCount: 10, cachedContentTokenCount: 10, totalTokenCount: 130 } };
   if (model.startsWith('anthropic:')) return { id: 'message-1', type: 'message', role: 'assistant', model: model.slice('anthropic:'.length), content: [{ type: 'text', text }], stop_reason: kind === 'length' ? 'max_tokens' : kind === 'filter' ? 'refusal' : 'end_turn', stop_sequence: null, usage: { input_tokens: 80, output_tokens: 30, cache_read_input_tokens: 10, cache_creation_input_tokens: 10 } };
@@ -33,6 +35,7 @@ describe('real SDK adapters using simulated HTTP', () => {
       expect(body.messages[0].content).toContain('Return JSON that conforms');
       expect(body.messages[0].content).toContain('title');
     }
+    else if (model.startsWith('kimi:')) expect(body.response_format).toMatchObject({ type: 'json_schema', json_schema: { strict: true, name: 'book', schema: { type: 'object', properties: { title: { type: 'string' } } } } });
     else expect(body.text.format).toMatchObject({ type: 'json_schema', strict: true });
   });
   it.each(models)('preserves usage for invalid structured output from %s', async model => {
@@ -53,6 +56,7 @@ describe('real SDK adapters using simulated HTTP', () => {
     if (model.startsWith('google:')) expect(body.generationConfig.thinkingConfig.thinkingLevel).toBe('high');
     else if (model.startsWith('anthropic:')) { expect(body.thinking.type).toBe('adaptive'); expect(body.output_config.effort).toBe('high'); }
     else if (model.startsWith('deepseek:')) { expect(body.thinking.type).toBe('enabled'); expect(body.reasoning_effort).toBe('high'); }
+    else if (model.startsWith('kimi:')) { expect(body.reasoning_effort).toBe('high'); expect(body.thinking).toBeUndefined(); }
     else expect(body.reasoning.effort).toBe('high');
   });
   it('adds the Haiku thinking budget to its output limit', async () => {

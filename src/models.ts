@@ -1,7 +1,8 @@
 /** Stable package identifiers. Provider API IDs remain in the catalog. */
-export const Provider = Object.freeze({ OpenAI: 'openai', Anthropic: 'anthropic', Google: 'google', XAI: 'xai', DeepSeek: 'deepseek', Mock: 'mock' } as const);
+export const Provider = Object.freeze({ OpenAI: 'openai', Anthropic: 'anthropic', Google: 'google', XAI: 'xai', DeepSeek: 'deepseek', Kimi: 'kimi', Mock: 'mock' } as const);
 export type BuiltinProvider = typeof Provider[keyof typeof Provider];
 export const LanguageModel = Object.freeze({
+  KimiK31Pro: 'kimi:kimi-k3.1-pro', KimiK31ProHighspeed: 'kimi:kimi-k3.1-pro-highspeed', KimiK3: 'kimi:kimi-k3',
   GPT61Terra: 'openai:gpt-6.1-terra', ClaudeHaiku55: 'anthropic:claude-haiku-5-5', Gemini4Argon: 'google:gemini-4-argon',
   DeepSeekFlash: 'deepseek:deepseek-flash', DeepSeekV4Pro: 'deepseek:deepseek-v4-pro',
   Mock: 'mock', GPT61Sol: 'openai:gpt-6.1-sol', GPT6Luna: 'openai:gpt-6-luna', GPT6Astra: 'openai:gpt-6-astra', ClaudeSonnet5: 'anthropic:claude-sonnet-5', ClaudeOpus5: 'anthropic:claude-opus-5',

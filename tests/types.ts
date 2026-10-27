@@ -12,6 +12,12 @@ if (false) {
   client.generate({ model: LanguageModel.ClaudeHaiku55, messages });
   client.generate({ model: LanguageModel.Gemini4Argon, messages });
   client.generateImage({ model: ImageModel.GeminiNanoBanana21, prompt: 'test' });
+  client.generate({ model: LanguageModel.KimiK31Pro, messages });
+  client.generate({ model: 'kimi:kimi-k3.1-pro-highspeed', messages });
+  // @ts-expect-error Kimi typo must not become an arbitrary string
+  client.generate({ model: 'kimi:kimi-k3.1-prp', messages });
+  // @ts-expect-error Kimi is not an image generator
+  client.generateImage({ model: LanguageModel.KimiK31Pro, prompt: 'test' });
   // @ts-expect-error DeepSeek typo must not become an arbitrary string
   client.generate({ model: 'deepseek:deepseek-flahs', messages });
   // @ts-expect-error DeepSeek is a language model, not an image generator

@@ -6,7 +6,7 @@ Estas instrucciones se aplican a todo el repositorio. Para preparar o revisar un
 
 - Paquete privado TypeScript para backend Node.js ≥24, basado en AI SDK. Mantener entradas ESM/CommonJS y declaraciones para ambas.
 - `src/client.ts`: orquestación; `types.ts`: contratos; `models.ts`/`catalog.ts`: identificadores, capacidades y tarifas; `pricing.ts`/`accounting.ts`: costes; `execution.ts`: plazo/reintentos; `images.ts`: imágenes; `providers/`: adaptadores opcionales.
-- Proveedores integrados: OpenAI, Anthropic, Google y xAI. No introducir dependencias de Editavia ni leer variables de entorno en el paquete; recibir configuración explícita.
+- Proveedores integrados: OpenAI, Anthropic, Google, xAI, DeepSeek y Kimi (Moonshot AI). No introducir dependencias de Editavia ni leer variables de entorno en el paquete; recibir configuración explícita.
 - Mantener tipos de modelos de texto/imagen separados. Los identificadores externos registrados con claves literales deben inferirse sin aceptar errores de escritura arbitrarios.
 - `mock` existe para texto, objetos, streaming e imágenes: sin red, credenciales ni coste; validar esquemas y no ejecutar herramientas reales.
 

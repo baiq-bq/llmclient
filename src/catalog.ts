@@ -60,6 +60,15 @@ for (const name of ['grok-4.7', 'grok-4.5', 'grok-4.3', 'grok-4.20-0309-reasonin
     : { ...effort, files: fileCaps(xaiImages), reasoning: name === 'grok-4.20-0309-non-reasoning' ? undefined : { mode: 'effort', efforts: ['grok-4.7', 'grok-4.5'].includes(name) ? ['low', 'medium', 'high', 'xhigh'] : ['low', 'medium', 'high'] } },
   source: `https://docs.x.ai/developers/models/${name}`,
 };
+// Verified 2026-10-27. Conservative synchronous output cap, not the context window.
+for (const name of ['kimi-k3.1-pro', 'kimi-k3.1-pro-highspeed', 'kimi-k3']) languageDefinitions[`kimi:${name}`] = {
+  capabilities: {
+    images: true, files: fileCaps([...imageTypes, 'image/gif']),
+    structuredOutput: true, streaming: true, tools: true, maxOutputTokens: 32_768,
+    reasoning: { mode: 'effort', efforts: ['low', 'high', 'max'] },
+  },
+  source: 'https://platform.kimi.ai/docs/models',
+};
 export const modelCatalog: Readonly<Record<ModelId, ModelDefinition>> = deepFreeze(languageDefinitions);
 export const pricingVersion = '2026-10-27';
 const openaiSource = 'https://developers.openai.com/api/docs/pricing';
@@ -96,6 +105,10 @@ const xaiSource = 'https://docs.x.ai/developers/pricing';
 for (const [name, input, output, cached] of [['grok-4.7', 2, 6, 0.5], ['grok-4.5', 2, 6, 0.3], ['grok-4.3', 1.25, 2.5, 0.2], ['grok-build-0.1', 1, 2, 0.2], ['grok-4.20-0309-reasoning', 1.25, 2.5, 0.2], ['grok-4.20-0309-non-reasoning', 1.25, 2.5, 0.2]] as const) priceDefinitions[`xai:${name}`] = { ...entry(xaiSource, input, output, cached), longContext: { minimumInputTokens: 200_000, rates: { input: input * 2, output: output * 2, cachedInput: cached * 2 } } };
 priceDefinitions['xai:grok-imagine-image'] = { rates: { image: 0.02, inputImage: 0.002 }, source: xaiSource, version: pricingVersion };
 priceDefinitions['xai:grok-imagine-image-quality'] = { rates: { image: 0.05, inputImage: 0.01 }, source: xaiSource, version: pricingVersion };
+// K3 cacheWrite uses the default 5m TTL. A 1h TTL requires an explicit rate override.
+for (const [name, input, output, cached, write] of [
+  ['kimi-k3.1-pro', 2, 10, 0.2, 2], ['kimi-k3.1-pro-highspeed', 4, 20, 0.2, 4], ['kimi-k3', 3, 15, 0.3, 3],
+] as const) priceDefinitions[`kimi:${name}`] = entry('https://platform.kimi.ai/docs/pricing/chat', input, output, cached, write);
 export const defaultPricing: Readonly<Record<ModelId, PricingEntry>> = deepFreeze(priceDefinitions);
 function deepFreeze<T extends object>(obj: T): T {
   for (const child of Object.values(obj)) if (child && typeof child === 'object') deepFreeze(child);

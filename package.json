@@ -1,6 +1,6 @@
 {
   "name": "@baiq/llmclient",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Configurable multi-provider LLM client with usage accounting, pricing overrides, tools and streaming",
   "license": "UNLICENSED",
   "type": "module",
@@ -80,6 +80,16 @@
         "types": "./dist/providers/deepseek.d.cts",
         "default": "./dist/providers/deepseek.cjs"
       }
+    },
+    "./providers/kimi": {
+      "import": {
+        "types": "./dist/providers/kimi.d.ts",
+        "default": "./dist/providers/kimi.js"
+      },
+      "require": {
+        "types": "./dist/providers/kimi.d.cts",
+        "default": "./dist/providers/kimi.cjs"
+      }
     }
   },
   "publishConfig": {
@@ -105,7 +115,8 @@
     "@ai-sdk/deepseek": "^3.0.74",
     "@ai-sdk/google": "^4.0.87",
     "@ai-sdk/openai": "^4.0.83",
-    "@ai-sdk/xai": "^5.0.14"
+    "@ai-sdk/xai": "^5.0.14",
+    "@ai-sdk/moonshotai": "^3.0.79"
   },
   "peerDependenciesMeta": {
     "@ai-sdk/openai": {
@@ -122,12 +133,16 @@
     },
     "@ai-sdk/deepseek": {
       "optional": true
+    },
+    "@ai-sdk/moonshotai": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "4.0.71",
     "@ai-sdk/deepseek": "3.0.74",
     "@ai-sdk/google": "4.0.87",
+    "@ai-sdk/moonshotai": "3.0.79",
     "@ai-sdk/openai": "4.0.83",
     "@ai-sdk/xai": "5.0.14",
     "@types/node": "^24.0.0",

@@ -1,6 +1,6 @@
 # @baiq/llmclient
 
-Cliente TypeScript para backend **Node.js ≥24**, basado en AI SDK. Unifica texto, objetos validados, streaming, herramientas y generación/edición de imágenes. Incluye adaptadores para OpenAI, Anthropic, Google Gemini, xAI y DeepSeek, un modelo `mock` sin red ni coste, y registro de proveedores/modelos externos.
+Cliente TypeScript para backend **Node.js ≥24**, basado en AI SDK. Unifica texto, objetos validados, streaming, herramientas y generación/edición de imágenes. Incluye adaptadores para OpenAI, Anthropic, Google Gemini, xAI, DeepSeek y Kimi (Moonshot AI), un modelo `mock` sin red ni coste, y registro de proveedores/modelos externos.
 
 Puedes instalar el mismo paquete en tantos proyectos como necesites, incluso fuera de Google Cloud. Cada aplicación necesita acceso lector al registro para instalar; después, solo usa las credenciales del proveedor que configure.
 
@@ -33,6 +33,7 @@ npm install @ai-sdk/anthropic   # adaptador Anthropic
 npm install @ai-sdk/google      # adaptador Google
 npm install @ai-sdk/xai         # adaptador xAI
 npm install @ai-sdk/deepseek    # adaptador DeepSeek
+npm install @ai-sdk/moonshotai  # adaptador Kimi
 ```
 
 Disponibles entradas ESM y CommonJS con declaraciones TypeScript. Las subrutas de proveedores evitan cargar SDK que no utilices.
@@ -46,6 +47,7 @@ import { anthropicAdapter } from '@baiq/llmclient/providers/anthropic';
 import { googleAdapter } from '@baiq/llmclient/providers/google';
 import { xaiAdapter } from '@baiq/llmclient/providers/xai';
 import { deepseekAdapter } from '@baiq/llmclient/providers/deepseek';
+import { kimiAdapter } from '@baiq/llmclient/providers/kimi';
 
 // Las credenciales las obtiene TU aplicación; el paquete siempre las recibe explícitamente.
 const client = createLlmClient({
@@ -55,6 +57,7 @@ const client = createLlmClient({
     googleAdapter({ apiKey: process.env.GOOGLE_API_KEY! }),
     xaiAdapter({ apiKey: process.env.XAI_API_KEY! }),
     deepseekAdapter({ apiKey: process.env.DEEPSEEK_API_KEY! }),
+    kimiAdapter({ apiKey: process.env.MOONSHOT_API_KEY! }),
   ],
   defaults: {
     model: LanguageModel.GPT61Sol,
@@ -172,6 +175,28 @@ const offPeak = createLlmClient({
 ```
 
 Se conserva la entrada cacheada por separado y el reasoning ya incluido en output no se vuelve a facturar. El consumo ausente permanece desconocido aunque el SDK rellene campos con cero.
+
+## Kimi: K3.1 Pro, Highspeed y K3
+
+Instala `@ai-sdk/moonshotai` ≥3.0.79 e importa `kimiAdapter` desde `@baiq/llmclient/providers/kimi`. Usa Chat Completions directo (`https://api.moonshot.ai/v1/chat/completions`), con clave explícita y `baseURL`, `headers` y `fetch` configurables. El identificador del proveedor en el paquete es `Provider.Kimi` (`kimi`); las opciones específicas del SDK usan `providerOptions.moonshotai`.
+
+```ts
+const kimi = createLlmClient({
+  providers: [kimiAdapter({ apiKey: process.env.MOONSHOT_API_KEY! })],
+});
+const answer = await kimi.generate({
+  model: LanguageModel.KimiK31Pro,
+  messages: [{ role: 'user', content: 'Explica cómo funciona una caché.' }],
+  reasoning: { effort: 'high' },
+});
+console.log(answer.text, answer.usage, answer.cost);
+```
+
+El catálogo incluye `KimiK31Pro` (`kimi-k3.1-pro`), `KimiK31ProHighspeed` (`kimi-k3.1-pro-highspeed`) y `KimiK3` (`kimi-k3`). Todos razonan siempre y admiten `low`, `high` y `max` (predeterminado del proveedor). Se rechazan `none`, esfuerzos intermedios y presupuestos en tokens antes de I/O. El paquete aplica un límite conservador de **32.768 tokens de salida**, independiente de la ventana de contexto de 1M. No expone temperatura porque el SDK la omite para Kimi. [Modelos](https://platform.kimi.ai/docs/models), [razonamiento](https://platform.kimi.ai/docs/guide/use-reasoning-effort), [SDK nativo](https://ai-sdk.dev/providers/ai-sdk-providers/moonshotai).
+
+Admite imágenes PNG/JPEG/WebP/GIF en bytes, hasta 5 MiB por imagen, diez imágenes y 20 MiB totales. PDF/DOCX, vídeo y generación de imágenes quedan fuera de esta ruta. `generateObject` envía `json_schema` estricto y valida el resultado final con Zod. El streaming expone texto y reasoning; las conversaciones y herramientas conservan `reasoning_content`. [Visión](https://platform.kimi.ai/docs/guide/use-kimi-vision-model), [salida estructurada y herramientas](https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart).
+
+**Tarifas estándar en USD/millón, verificadas el 2026-10-27:** input/output/lectura de caché/escritura de cinco minutos: K3.1 Pro **2/10/0,20/2**; Highspeed **4/20/0,20/4**; K3 **3/15/0,30/3**. Se descuentan lectura y escritura del total de entrada; el reasoning ya está incluido en output. Los contadores ausentes permanecen desconocidos y producen coste parcial/desconocido. Si eliges `providerOptions.moonshotai.promptCacheOptions: { mode: 'implicit', ttl: '1h' }`, sobrescribe `pricing[modelo].rates.cacheWrite` a **4**, **8** o **6**, respectivamente. El cliente no cambia la tarifa automáticamente y la API puede renovar una entrada con su TTL original: la aplicación debe usar la tarifa correspondiente a la escritura facturada. [Precios](https://platform.kimi.ai/docs/pricing/chat), [caché](https://platform.kimi.ai/docs/guide/context-caching).
 
 ## Extraer un objeto validado
 
@@ -550,6 +575,8 @@ Actualización de modelos contrastada el **2026-10-27**. Las nuevas capacidades 
 - **xAI texto:** `Grok47`, `GrokBuild01`, `Grok46`, `Grok45`, `Grok43`, `Grok420Reasoning`, `Grok420NonReasoning`. Imagen: `GrokImagineImage2`, `GrokImagineImage`, `GrokImagineImageQuality` (retirada anunciada para 2026-11-02). Texto admite PNG/JPEG; las referencias de imagen de generación siguen su propio contrato. [Modelos](https://docs.x.ai/developers/models), [precios](https://docs.x.ai/developers/pricing).
 
 - **DeepSeek texto:** `DeepSeekFlash` (`deepseek-flash`, versión V4.1-Flash-1017) y `DeepSeekV4Pro` (`deepseek-v4-pro`, versión V4-Pro-0813). Flash admite imágenes; Pro solo texto. Los alias retirados `deepseek-chat`, `deepseek-reasoner` y `deepseek-v4-flash` no se añaden al catálogo. [Modelos y tarifas](https://api-docs.deepseek.com/quick_start/pricing/), [razonamiento](https://api-docs.deepseek.com/guides/thinking_mode/), [visión](https://api-docs.deepseek.com/guides/vision/), [JSON](https://api-docs.deepseek.com/guides/json_mode/), [herramientas](https://api-docs.deepseek.com/guides/thinking_mode/#tool-calls).
+
+- **Kimi texto/visión:** `KimiK31Pro`, `KimiK31ProHighspeed`, `KimiK3`. Solo la familia K3; no se incorpora K2. [Modelos](https://platform.kimi.ai/docs/models), [precios](https://platform.kimi.ai/docs/pricing/chat).
 
 Se excluyen endpoints de voz/Live, vídeo, embeddings, moderación, entrenamiento, multiagente alojado y ofertas especializadas con contrato de acceso/endpoint distinto. Los modelos retirados no se recomiendan. Para servicios especializados utiliza otro adaptador; este paquete no promete cubrir todos los endpoints de cada proveedor.
 

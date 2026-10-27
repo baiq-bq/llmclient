@@ -5,7 +5,8 @@ import { anthropicAdapter } from '../src/providers/anthropic.js';
 import { googleAdapter } from '../src/providers/google.js';
 import { xaiAdapter } from '../src/providers/xai.js';
 import { deepseekAdapter } from '../src/providers/deepseek.js';
-const adapters = [openaiAdapter({ apiKey: 'synthetic' }), anthropicAdapter({ apiKey: 'synthetic' }), googleAdapter({ apiKey: 'synthetic' }), xaiAdapter({ apiKey: 'synthetic' }), deepseekAdapter({ apiKey: 'synthetic' })];
+import { kimiAdapter } from '../src/providers/kimi.js';
+const adapters = [openaiAdapter({ apiKey: 'synthetic' }), anthropicAdapter({ apiKey: 'synthetic' }), googleAdapter({ apiKey: 'synthetic' }), xaiAdapter({ apiKey: 'synthetic' }), deepseekAdapter({ apiKey: 'synthetic' }), kimiAdapter({ apiKey: 'synthetic' })];
 const messages = [{ role: 'user' as const, content: 'test' }];
 describe('verified catalog transport compatibility', () => {
   it('keeps exported identifiers and adapter catalogs synchronized', () => {
@@ -39,6 +40,9 @@ describe('verified catalog transport compatibility', () => {
     } else if (model.startsWith('deepseek:')) {
       expect(body.thinking.type).toBe(effort === 'none' ? 'disabled' : 'enabled');
       expect(body.reasoning_effort).toBe(effort === 'none' ? undefined : effort);
+    } else if (model.startsWith('kimi:')) {
+      expect(body.reasoning_effort).toBe(effort);
+      expect(body.thinking).toBeUndefined();
     } else expect(body.reasoning.effort).toBe(effort);
   });
   it.each(builtinImageModels.filter(id => id !== 'mock'))('sends the exact image model ID for %s', async model => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { assertPublicVersion } from '../scripts/public-release.mjs';
 import { assertReleaseVersion } from '../scripts/version-policy.mjs';
 const registry = 'https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/';
 function fixture(version = '0.1.1') {
@@ -20,5 +21,20 @@ describe('release version policy (local unit tests)', () => {
   it('requires lockfile root and package entry to match', () => {
     const { pkg, lock } = fixture(); lock.packages[''].version = '0.1.0'; expect(() => assertReleaseVersion(pkg, lock, ['0.1.0'])).toThrow('package-lock.json');
     const other = fixture(); other.lock.version = '0.1.0'; expect(() => assertReleaseVersion(other.pkg, other.lock, ['0.1.0'])).toThrow('package-lock.json');
+  });
+});
+
+describe('public registry version gate', () => {
+  it('allows a new package and a strictly newer version', () => {
+    expect(() => assertPublicVersion('0.4.1', 404)).not.toThrow();
+    expect(() => assertPublicVersion('0.4.1', 200, { versions: { '0.4.0': {} } })).not.toThrow();
+  });
+  it('rejects duplicates, older versions and inaccessible or malformed metadata', () => {
+    expect(() => assertPublicVersion('0.4.1', 200, { versions: { '0.4.1': {} } })).toThrow();
+    expect(() => assertPublicVersion('0.4.1', 200, { versions: { '0.5.0': {} } })).toThrow();
+    expect(() => assertPublicVersion('0.4.1', 403)).toThrow();
+    expect(() => assertPublicVersion('0.4.1', 500)).toThrow();
+    expect(() => assertPublicVersion('0.4.1', 200, { versions: {} })).toThrow();
+    expect(() => assertPublicVersion('0.4.1', 200, { versions: { bad: {} } })).toThrow();
   });
 });

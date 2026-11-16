@@ -46,11 +46,11 @@ Estas instrucciones se aplican a todo el repositorio. Para preparar o revisar un
 ## Publicación e infraestructura
 
 - Proyecto: `baiq-459807`; región: `europe-west1`; repositorio npm estándar privado: `npm-private`; scope: `@baiq`.
-- Registro exclusivo: `https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/`. No publicar a npm público, no guardar tokens/keys en Git ni en el tarball.
+- Registro privado original: `https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/`. No publicar a npm público, no guardar tokens/keys en Git ni en el tarball.
 - Trigger: `llmclient-main-publish`, GitHub `baiq-bq/llmclient`, push a `^main$`, configuración `cloudbuild.yaml`. No triggers de PR con permisos de publicación.
 - Conexión GitHub dedicada: `llmclient`, instalación existente de `baiq-bq`. Credencial OAuth en Secret Manager; no copiar tokens al repositorio. No modificar la conexión compartida `baiq`.
-- Cuenta de servicio dedicada: `llmclient-publisher@baiq-459807.iam.gserviceaccount.com`, writer solo sobre `npm-private`, logWriter en el proyecto. Consumidores: reader por repositorio; nunca `allUsers`/`allAuthenticatedUsers`.
-- Cloud Build: npm ci → token temporal → gate SemVer/lockfile contra todas las versiones del registro → tipos/build/imports → repetir gate y publicar. Una versión repetida o inferior es **error**, no skip ni éxito. Errores de auth/red/metadatos también bloquean publicación.
+- Cuenta de servicio dedicada: `llmclient-publisher@baiq-459807.iam.gserviceaccount.com`, writer sobre `npm-private` y `llmclient-public`, logWriter en el proyecto. El repositorio `llmclient-public` permite lectura a `allUsers` exclusivamente para distribuir este paquete; `npm-private` sigue privado.
+- Cloud Build: npm ci → token temporal → gate SemVer/lockfile contra todas las versiones del registro → tipos/build/imports → repetir gate y publicar en privado → verificar versiones y publicar copia en `llmclient-public`. Una versión repetida o inferior es **error**, no skip ni éxito. Errores de auth/red/metadatos también bloquean publicación.
 - El gate final protege frente a builds concurrentes; npm puede rechazar un conflicto de publicación y no debe ocultarse. No prometer una publicación por cada commit intermedio de un push: el trigger procesa el commit recibido por el evento GitHub.
 - Comandos gcloud siempre con proyecto/región explícitos; no cambiar el proyecto activo ni alterar conexiones/triggers de otros servicios.
 - El script manual `publish:private` ejecuta checks locales y usa gcloud; el script CI no llama tests ni gcloud desde el contenedor Node. Los tokens temporales se eliminan al finalizar.

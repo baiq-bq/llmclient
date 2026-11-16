@@ -2,39 +2,31 @@
 
 Cliente TypeScript para backend **Node.js ≥24**, basado en AI SDK. Unifica texto, objetos validados, streaming, herramientas y generación/edición de imágenes. Incluye adaptadores para OpenAI, Anthropic, Google Gemini, xAI, DeepSeek y Kimi (Moonshot AI), un modelo `mock` sin red ni coste, y registro de proveedores/modelos externos.
 
-Puedes instalar el mismo paquete en tantos proyectos como necesites, incluso fuera de Google Cloud. Cada aplicación necesita acceso lector al registro para instalar; después, solo usa las credenciales del proveedor que configure.
+Puedes instalar el mismo paquete en tantos proyectos como necesites, incluso fuera de Google Cloud. La instalación pública no requiere credenciales de Google Cloud; la aplicación usa las credenciales del proveedor que configure.
 
 Cada cliente tiene configuración y tarifas independientes. El paquete no lee variables de entorno, no convierte documentos y no registra automáticamente credenciales, prompts, respuestas ni cuerpos del proveedor.
 
-## Instalación privada
+## Instalación pública
 
-Registro: `https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/`.
-
-Añade al `.npmrc` de la aplicación **solo** el registro del scope:
+En el `.npmrc` del proyecto consumidor, configura el scope para el registro público de Google Cloud:
 
 ```ini
-@baiq:registry=https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/
+@baiq:registry=https://europe-west1-npm.pkg.dev/baiq-459807/llmclient-public/
 ```
 
-Autentica con una identidad que tenga `roles/artifactregistry.reader` sobre el repositorio. Para desarrollo, un token temporal de `gcloud` puede usarse en un archivo de configuración externo al proyecto; no lo subas a Git:
+Después instala el cliente y el adaptador que necesites. No se requieren credenciales de Google Cloud para descargarlo:
 
 ```bash
-gcloud auth login
-npm config set --userconfig="$HOME/.npmrc" \
-  //europe-west1-npm.pkg.dev/baiq-459807/npm-private/:_authToken \
-  "$(gcloud auth print-access-token --project=baiq-459807)"
 npm install @baiq/llmclient @ai-sdk/openai zod
 ```
 
-El token caduca aproximadamente en una hora. En CI utiliza identidad federada o una cuenta de servicio autorizada y genera el token al instalar. Los SDK de proveedores son **peer dependencies opcionales**: instala únicamente los que vayas a importar.
+El scope `@baiq` solo puede apuntar a un registro en cada proyecto. Si también usas paquetes privados del mismo scope, conserva su configuración privada y gestiona esta dependencia según las necesidades de tu proyecto. Los SDK de proveedores son **peer dependencies opcionales**:
 
 ```bash
-npm install @ai-sdk/anthropic   # adaptador Anthropic
-npm install @ai-sdk/google      # adaptador Google
-npm install @ai-sdk/xai         # adaptador xAI
-npm install @ai-sdk/deepseek    # adaptador DeepSeek
-npm install @ai-sdk/moonshotai  # adaptador Kimi
+npm install @ai-sdk/anthropic @ai-sdk/google @ai-sdk/xai @ai-sdk/deepseek @ai-sdk/moonshotai
 ```
+
+La lectura es pública; para llamar a un proveedor real sigues necesitando sus propias credenciales. El modelo `mock` no las necesita.
 
 Disponibles entradas ESM y CommonJS con declaraciones TypeScript. Las subrutas de proveedores evitan cargar SDK que no utilices.
 

@@ -15,7 +15,15 @@ describe('verified catalog transport compatibility', () => {
     for (const adapter of adapters) {
       expect(Object.keys(adapter.models!).map(id => `${adapter.id}:${id}`).sort()).toEqual(Object.keys(modelCatalog).filter(id => id.startsWith(`${adapter.id}:`)).sort());
     }
-    for (const model of Object.keys(modelCatalog)) expect(defaultPricing[model as keyof typeof defaultPricing]).toHaveProperty('version', '2026-10-27');
+    for (const model of Object.keys(modelCatalog)) expect(defaultPricing[model as keyof typeof defaultPricing]).toHaveProperty('version', '2026-11-16');
+  });
+  it('uses current rates for the latest Anthropic and Gemini models', () => {
+    expect(defaultPricing[LanguageModel.ClaudeFable52]!.rates).toEqual({ input: 8, output: 40, cachedInput: 0.2, cacheWrite: 10 });
+    expect(defaultPricing[LanguageModel.ClaudeMythos52]!.rates).toEqual(defaultPricing[LanguageModel.ClaudeFable52]!.rates);
+    expect(defaultPricing[LanguageModel.ClaudeSonnet55]!.rates.cachedInput).toBe(0.1);
+    expect(defaultPricing[LanguageModel.Gemini4Carbon]!.rates).toEqual({ input: 2, output: 10, cachedInput: 0.1 });
+    expect(defaultPricing[LanguageModel.Gemini4Hydrogen]!.rates).toEqual({ input: 1.5, output: 7.5, cachedInput: 0.075 });
+    expect(defaultPricing['xai:grok-imagine-image-quality']!.rates).toEqual({ image: 0.04, inputImage: 0.01 });
   });
   it.each(builtinLanguageModels.filter(id => id !== 'mock'))('sends the exact language model ID for %s', async model => {
     let body: any; let url: string;

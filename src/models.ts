@@ -2,6 +2,7 @@
 export const Provider = Object.freeze({ OpenAI: 'openai', Anthropic: 'anthropic', Google: 'google', XAI: 'xai', DeepSeek: 'deepseek', Kimi: 'kimi', Mock: 'mock' } as const);
 export type BuiltinProvider = typeof Provider[keyof typeof Provider];
 export const LanguageModel = Object.freeze({
+  ClaudeFable52: 'anthropic:claude-fable-5-2', ClaudeMythos52: 'anthropic:claude-mythos-5-2', Gemini4Carbon: 'google:gemini-4-carbon', Gemini4Hydrogen: 'google:gemini-4-hydrogen',
   KimiK31Pro: 'kimi:kimi-k3.1-pro', KimiK31ProHighspeed: 'kimi:kimi-k3.1-pro-highspeed', KimiK3: 'kimi:kimi-k3',
   GPT61Terra: 'openai:gpt-6.1-terra', ClaudeHaiku55: 'anthropic:claude-haiku-5-5', Gemini4Argon: 'google:gemini-4-argon',
   DeepSeekFlash: 'deepseek:deepseek-flash', DeepSeekV4Pro: 'deepseek:deepseek-v4-pro',
@@ -10,6 +11,7 @@ export const LanguageModel = Object.freeze({
 } as const);
 export type BuiltinLanguageModel = typeof LanguageModel[keyof typeof LanguageModel];
 export const ImageModel = Object.freeze({
+  GPTImage26Sunburst: 'openai:gpt-image-2.6-sunburst', GPTImage26Flare: 'openai:gpt-image-2.6-flare',
   GeminiNanoBanana21: 'google:gemini-nano-banana-2.1',
   Mock: 'mock', GPTImage25Sunburst: 'openai:gpt-image-2.5-sunburst', GPTImage25Flare: 'openai:gpt-image-2.5-flare', GPTImage2: 'openai:gpt-image-2', Gemini31FlashImage: 'google:gemini-3.1-flash-image', Gemini31FlashImagePreview: 'google:gemini-3.1-flash-image-preview', Gemini31FlashLiteImage: 'google:gemini-3.1-flash-lite-image', Gemini3ProImage: 'google:gemini-3-pro-image', GrokImagineImage2: 'xai:grok-imagine-image-2.0', GrokImagineImage: 'xai:grok-imagine-image', GrokImagineImageQuality: 'xai:grok-imagine-image-quality',
 } as const);

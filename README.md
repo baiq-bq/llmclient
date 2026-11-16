@@ -71,7 +71,7 @@ const client = createLlmClient({
 
 const provider = Provider.OpenAI;        // 'openai'
 const model = LanguageModel.GPT61Sol;   // 'openai:gpt-6.1-sol'
-const imageModel = ImageModel.GPTImage25Sunburst;
+const imageModel = ImageModel.GPTImage26Sunburst;
 console.log(client.listModels());       // capacidades, fuentes y proveedores configurados
 ```
 
@@ -488,7 +488,57 @@ Esta tarifa cubre la llamada completa; no se suman además sus tokens. Ajusta tu
 
 `cost.status` es `known`, `partial` o `unknown`. `estimatedUsd` es el subtotal conocido; `null` significa que no se conoce ningún componente facturable. Una llamada fallida sin consumo reportado impide presentar la factura total como completa. `entries[].cost.missing` explica qué falta y `appliedPricing.origins` indica `internal`/`custom` por campo. Caché de lectura se descuenta de la entrada normal; caché de escritura se cobra aparte cuando se reporta.
 
-Las tarifas internas son una instantánea de **2026-10-27** de procesamiento estándar/global bajo demanda. No incluyen impuestos, almacenamiento de caché, herramientas alojadas, descuentos Batch/Flex ni recargos regionales/Priority/Fast. Anthropic usa escritura de caché de cinco minutos; si seleccionas una hora, debes sobrescribir esa tarifa. Gemini 4 Argon usa precios introductorios hasta 2026-11-30: desde 2026-12-01, input/output/caché pasan de 2/10/0,10 a 4/20/0,20 USD por millón. Google 3.8/3.7/3.6 tiene precios introductorios hasta 2026-12-31: actualiza la tabla para operaciones posteriores. No hay descubrimiento automático de precios ni modelos al arrancar.
+Las tarifas internas son una instantánea de **2026-11-16** de procesamiento estándar/global bajo demanda. No incluyen impuestos, almacenamiento de caché, herramientas alojadas, descuentos Batch/Flex ni recargos regionales/Priority/Fast. Anthropic usa escritura de caché de cinco minutos; si seleccionas una hora, debes sobrescribir esa tarifa. Gemini 4 Argon y Carbon usan precios introductorios hasta 2026-11-30: desde 2026-12-01, input/output/caché pasan de 2/10/0,10 a 4/20/0,20 USD por millón. Google 3.8/3.7/3.6 tiene precios introductorios hasta 2026-12-31: actualiza la tabla para operaciones posteriores. No hay descubrimiento automático de precios ni modelos al arrancar.
+
+## Tabla de modelos y costes de texto
+
+Tarifas internas estándar en USD por millón de tokens, verificadas el 16 de noviembre de 2026. Columnas: entrada, salida, lectura de caché y escritura de caché (cinco minutos para Anthropic). «—» indica que el paquete no dispone de una tarifa para ese concepto. Consulta las fuentes enlazadas: los tramos de contexto largo y condiciones especiales se describen bajo la tabla.
+
+| Proveedor y modelos | Entrada | Salida | Caché lectura | Caché escritura |
+| --- | ---: | ---: | ---: | ---: |
+| OpenAI GPT-6 Astra | 10 | 50 | 1 | 12,5 |
+| OpenAI GPT-6.1 Sol | 2 | 10 | 0,1 | 2,5 |
+| OpenAI GPT-6.1 Terra | 1 | 5 | 0,05 | 1,25 |
+| OpenAI GPT-6 Luna | 0,1 | 0,5 | 0,01 | 0,125 |
+| Anthropic Claude Fable 5.2, Mythos 5.2 | 8 | 40 | 0,2 | 10 |
+| Anthropic Claude Fable 5.1, Mythos 5.1 | 10 | 50 | 0,25 | 12,5 |
+| Anthropic Claude Opus 5.5 | 4 | 20 | 0,2 | 5 |
+| Anthropic Claude Opus 5 | 5 | 25 | 0,5 | 6,25 |
+| Anthropic Claude Sonnet 5.5 | 2 | 10 | 0,1 | 2,5 |
+| Anthropic Claude Sonnet 5 | 2 | 10 | 0,2 | 2,5 |
+| Anthropic Claude Haiku 5.5 | 0,1 | 0,5 | 0,01 | 0,125 |
+| Anthropic Claude Haiku 4.5 | 1 | 5 | 0,1 | 1,25 |
+| Google Gemini 4 Carbon, 4 Argon | 2 | 10 | 0,1 | — |
+| Google Gemini 4 Hydrogen | 1,5 | 7,5 | 0,075 | — |
+| Google Gemini 3.8, 3.7, 3.6 Flash | 0,75 | 3,75 | 0,075 | — |
+| Google Gemini 3.5 Flash | 1,5 | 9 | 0,15 | — |
+| Google Gemini 3.5 Flash Lite | 0,3 | 2,5 | 0,03 | — |
+| Google Gemini 3.1 Flash Lite | 0,25 | 1,5 | 0,025 | — |
+| Google Gemini 3.1 Pro Preview | 2 | 12 | 0,2 | — |
+| Google Gemini 3 Flash Preview | 0,5 | 3 | 0,05 | — |
+| xAI Grok 4.7, 4.6 | 2 | 6 | 0,5 | — |
+| xAI Grok 4.5 | 2 | 6 | 0,3 | — |
+| xAI Grok 4.3, 4.20 Reasoning y Non-Reasoning | 1,25 | 2,5 | 0,2 | — |
+| xAI Grok Build 0.1 | 1 | 2 | 0,2 | — |
+| Kimi K3.1 Pro | 2 | 10 | 0,2 | 2 |
+| Kimi K3.1 Pro Highspeed | 4 | 20 | 0,2 | 4 |
+| Kimi K3 | 3 | 15 | 0,3 | 3 |
+| DeepSeek Flash y V4 Pro | Variable | Variable | Variable | — |
+| Mock | 0 | 0 | 0 | 0 |
+
+Los tramos largos de OpenAI, Haiku 5.5, Gemini 3.1 Pro Preview y xAI se aplican por solicitud; `defaultPricing` expone los umbrales y tarifas exactos. DeepSeek requiere tarifas explícitas por horario y festivos, detalladas arriba. Mythos requiere verificación de la organización. Los modelos Preview están sujetos a cambios. Fuentes: [OpenAI](https://developers.openai.com/api/docs/pricing), [Anthropic](https://platform.claude.com/docs/en/about-claude/pricing), [Google](https://ai.google.dev/gemini-api/docs/pricing), [xAI](https://docs.x.ai/developers/pricing), [DeepSeek](https://api-docs.deepseek.com/quick_start/pricing/) y [Kimi](https://platform.kimi.ai/docs/pricing/chat).
+
+## Costes de imágenes
+
+| Modelos | Tarifa interna |
+| --- | --- |
+| xAI Grok Imagine Image | 0,02 USD/imagen generada y 0,002 USD/imagen de entrada |
+| xAI Grok Imagine Image 2.0 y Quality | 0,04 USD/imagen generada y 0,01 USD/imagen de entrada para 1K y calidad low |
+| OpenAI GPT Image 2.6 Sunburst/Flare, 2.5 Sunburst/Flare y 2 | Sin tarifa interna: el precio depende de tokens, calidad y resolución |
+| Google Nano Banana 2.1, Gemini 3.1 Flash Image, Flash Image Preview, Flash Lite Image y 3 Pro Image | Sin tarifa interna: el precio depende de tokens y resolución |
+| Mock | 0 USD |
+
+xAI retiró `grok-imagine-image-quality` y redirige su identificador a Image 2.0 low desde el 2 de noviembre; se conserva por compatibilidad. Consulta [la migración de xAI](https://docs.x.ai/developers/migration/imagine-image-quality-nov-2), [precios de OpenAI](https://developers.openai.com/api/docs/pricing) y [precios de Google](https://ai.google.dev/gemini-api/docs/pricing). Para otras resoluciones y calidades configura una tarifa explícita.
 
 ## Modelo mock: desarrollo sin credenciales ni coste
 

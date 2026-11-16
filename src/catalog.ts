@@ -7,7 +7,7 @@ const common = { images: true, files: fileCaps([...imageTypes, ...documents]), s
 const xaiImages = ['image/png', 'image/jpeg'];
 const effort: ModelCapabilities = { ...common, maxOutputTokens: 128_000, reasoning: { mode: 'effort', efforts: ['low', 'medium', 'high'] } };
 const adaptive: ModelCapabilities = { ...common, maxOutputTokens: 128_000, reasoning: { mode: 'adaptive', efforts: ['none', 'low', 'medium', 'high'] } };
-/** Conservative supported subset, updated 2026-10-27. Additional models can be registered per client. */
+/** Conservative supported subset, updated 2026-11-16. Additional models can be registered per client. */
 const languageDefinitions: Record<ModelId, ModelDefinition> = {
   'openai:gpt-6-astra': { capabilities: { ...effort, files: fileCaps([...imageTypes, ...documents, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'text/plain', 'text/markdown', 'application/json', 'text/html', 'application/rtf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'], 20 * 1024 * 1024) }, source: 'https://developers.openai.com/api/docs/models/gpt-6-astra' },
   'anthropic:claude-sonnet-5': { capabilities: adaptive, source: 'https://platform.claude.com/docs/en/models/overview' },
@@ -29,7 +29,7 @@ for (const name of ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-luna']
   capabilities: { ...openaiCaps, reasoning: { mode: 'effort', efforts: name === 'gpt-6-luna' ? ['none', ...fullEfforts] : fullEfforts } },
   source: `https://developers.openai.com/api/docs/models/${name}`,
 };
-for (const name of ['claude-fable-5-1', 'claude-mythos-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5']) languageDefinitions[`anthropic:${name}`] = {
+for (const name of ['claude-fable-5-2', 'claude-mythos-5-2', 'claude-fable-5-1', 'claude-mythos-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5']) languageDefinitions[`anthropic:${name}`] = {
   capabilities: { ...adaptive, reasoning: { mode: 'adaptive', efforts: fullEfforts } },
   source: 'https://platform.claude.com/docs/en/models/overview',
 };
@@ -41,6 +41,11 @@ languageDefinitions['anthropic:claude-haiku-5-5'] = {
 languageDefinitions['google:gemini-4-argon'] = {
   capabilities: { ...googleCaps, maxOutputTokens: 65_536, temperature: undefined },
   source: 'https://ai.google.dev/gemini-api/docs/models/gemini-4-argon',
+};
+// Hydrogen supports xhigh upstream, but the installed Google SDK cannot transport it.
+for (const name of ['gemini-4-carbon', 'gemini-4-hydrogen']) languageDefinitions[`google:${name}`] = {
+  capabilities: { ...googleCaps, temperature: undefined, reasoning: { mode: 'level', efforts: ['low', 'medium', 'high'] } },
+  source: `https://aistudio.google.com/docs/models/${name}`,
 };
 for (const name of ['deepseek-flash', 'deepseek-v4-pro']) languageDefinitions[`deepseek:${name}`] = {
   capabilities: {
@@ -60,7 +65,7 @@ for (const name of ['grok-4.7', 'grok-4.5', 'grok-4.3', 'grok-4.20-0309-reasonin
     : { ...effort, files: fileCaps(xaiImages), reasoning: name === 'grok-4.20-0309-non-reasoning' ? undefined : { mode: 'effort', efforts: ['grok-4.7', 'grok-4.5'].includes(name) ? ['low', 'medium', 'high', 'xhigh'] : ['low', 'medium', 'high'] } },
   source: `https://docs.x.ai/developers/models/${name}`,
 };
-// Verified 2026-10-27. Conservative synchronous output cap, not the context window.
+// Verified 2026-11-16. Conservative synchronous output cap, not the context window.
 for (const name of ['kimi-k3.1-pro', 'kimi-k3.1-pro-highspeed', 'kimi-k3']) languageDefinitions[`kimi:${name}`] = {
   capabilities: {
     images: true, files: fileCaps([...imageTypes, 'image/gif']),
@@ -70,7 +75,7 @@ for (const name of ['kimi-k3.1-pro', 'kimi-k3.1-pro-highspeed', 'kimi-k3']) lang
   source: 'https://platform.kimi.ai/docs/models',
 };
 export const modelCatalog: Readonly<Record<ModelId, ModelDefinition>> = deepFreeze(languageDefinitions);
-export const pricingVersion = '2026-10-27';
+export const pricingVersion = '2026-11-16';
 const openaiSource = 'https://developers.openai.com/api/docs/pricing';
 const anthropicSource = 'https://platform.claude.com/docs/en/about-claude/pricing';
 /** Standard/global/on-demand text and image token rates; excludes storage, hosted tools, tax and nonstandard service tiers. */
@@ -85,7 +90,7 @@ const priceDefinitions: Record<ModelId, PricingEntry> = {
 };
 const entry = (source: string, input: number, output: number, cachedInput: number, cacheWrite?: number): PricingEntry => ({ rates: { input, output, cachedInput, ...(cacheWrite !== undefined ? { cacheWrite } : {}) }, source, version: pricingVersion });
 for (const [name, input, output, cached] of [['gpt-6.1-sol', 2, 10, 0.1], ['gpt-6.1-terra', 1, 5, 0.05], ['gpt-6-luna', 0.1, 0.5, 0.01]] as const) priceDefinitions[`openai:${name}`] = { ...entry(openaiSource, input, output, cached, input * 1.25), longContext: { minimumInputTokens: 272_001, rates: { input: input * 2, output: output * 1.5, cachedInput: cached * 2, cacheWrite: input * 2.5 } } };
-for (const [name, input, output, cached] of [['claude-fable-5-1', 10, 50, 0.25], ['claude-mythos-5-1', 10, 50, 0.25], ['claude-opus-5-5', 4, 20, 0.2], ['claude-sonnet-5-5', 2, 10, 0.2]] as const) priceDefinitions[`anthropic:${name}`] = entry(anthropicSource, input, output, cached, input * 1.25);
+for (const [name, input, output, cached] of [['claude-fable-5-2', 8, 40, 0.2], ['claude-mythos-5-2', 8, 40, 0.2], ['claude-fable-5-1', 10, 50, 0.25], ['claude-mythos-5-1', 10, 50, 0.25], ['claude-opus-5-5', 4, 20, 0.2], ['claude-sonnet-5-5', 2, 10, 0.1]] as const) priceDefinitions[`anthropic:${name}`] = entry(anthropicSource, input, output, cached, input * 1.25);
 priceDefinitions['anthropic:claude-haiku-5-5'] = {
   ...entry('https://platform.claude.com/docs/en/models/haiku-5-5/overview', 0.1, 0.5, 0.01, 0.125),
   longContext: { minimumInputTokens: 100_001, rates: { input: 0.5, output: 2.5, cachedInput: 0.05, cacheWrite: 0.625 } },
@@ -98,13 +103,15 @@ for (const name of ['deepseek-flash', 'deepseek-v4-pro']) priceDefinitions[`deep
 const googleSource = 'https://ai.google.dev/gemini-api/docs/pricing';
 // Introductory standard rates through 2026-11-30; override for later requests.
 priceDefinitions['google:gemini-4-argon'] = entry(googleSource, 2, 10, 0.1);
+priceDefinitions['google:gemini-4-carbon'] = entry(googleSource, 2, 10, 0.1);
+priceDefinitions['google:gemini-4-hydrogen'] = entry(googleSource, 1.5, 7.5, 0.075);
 for (const name of ['gemini-3.7-flash', 'gemini-3.6-flash']) priceDefinitions[`google:${name}`] = entry(googleSource, 0.75, 3.75, 0.075);
 for (const [name, input, output, cached] of [['gemini-3.5-flash', 1.5, 9, 0.15], ['gemini-3.5-flash-lite', 0.3, 2.5, 0.03], ['gemini-3.1-flash-lite', 0.25, 1.5, 0.025], ['gemini-3-flash-preview', 0.5, 3, 0.05]] as const) priceDefinitions[`google:${name}`] = entry(googleSource, input, output, cached);
 priceDefinitions['google:gemini-3.1-pro-preview'] = { ...entry(googleSource, 2, 12, 0.2), longContext: { minimumInputTokens: 200_001, rates: { input: 4, output: 18, cachedInput: 0.4 } } };
 const xaiSource = 'https://docs.x.ai/developers/pricing';
 for (const [name, input, output, cached] of [['grok-4.7', 2, 6, 0.5], ['grok-4.5', 2, 6, 0.3], ['grok-4.3', 1.25, 2.5, 0.2], ['grok-build-0.1', 1, 2, 0.2], ['grok-4.20-0309-reasoning', 1.25, 2.5, 0.2], ['grok-4.20-0309-non-reasoning', 1.25, 2.5, 0.2]] as const) priceDefinitions[`xai:${name}`] = { ...entry(xaiSource, input, output, cached), longContext: { minimumInputTokens: 200_000, rates: { input: input * 2, output: output * 2, cachedInput: cached * 2 } } };
 priceDefinitions['xai:grok-imagine-image'] = { rates: { image: 0.02, inputImage: 0.002 }, source: xaiSource, version: pricingVersion };
-priceDefinitions['xai:grok-imagine-image-quality'] = { rates: { image: 0.05, inputImage: 0.01 }, source: xaiSource, version: pricingVersion };
+priceDefinitions['xai:grok-imagine-image-quality'] = { rates: { image: 0.04, inputImage: 0.01 }, source: 'https://docs.x.ai/developers/migration/imagine-image-quality-nov-2', version: pricingVersion };
 // K3 cacheWrite uses the default 5m TTL. A 1h TTL requires an explicit rate override.
 for (const [name, input, output, cached, write] of [
   ['kimi-k3.1-pro', 2, 10, 0.2, 2], ['kimi-k3.1-pro-highspeed', 4, 20, 0.2, 4], ['kimi-k3', 3, 15, 0.3, 3],
@@ -121,7 +128,7 @@ const imageDefinitions: Record<ModelId, ImageModelDefinition> = {
   'google:gemini-3.1-flash-image-preview': { files: fileCaps(imageTypes, 5 * 1024 * 1024, 4), maxImages: 10, aspectRatios: ['1:1', '1:4', '1:8', '2:3', '3:2', '3:4', '4:1', '4:3', '4:5', '5:4', '8:1', '9:16', '16:9', '21:9'], source: 'https://ai.google.dev/gemini-api/docs/image-generation' },
   'xai:grok-imagine-image-2.0': { files: fileCaps(imageTypes, 5 * 1024 * 1024, 5), maxImages: 10, aspectRatios: ['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9'], source: 'https://docs.x.ai/developers/model-capabilities/images/generation' },
 };
-for (const name of ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare']) imageDefinitions[`openai:${name}`] = { ...imageDefinitions['openai:gpt-image-2']!, source: `https://developers.openai.com/api/docs/models/${name}` };
+for (const name of ['gpt-image-2.6-sunburst', 'gpt-image-2.6-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare']) imageDefinitions[`openai:${name}`] = { ...imageDefinitions['openai:gpt-image-2']!, source: `https://developers.openai.com/api/docs/models/${name}` };
 for (const name of ['gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image', 'gemini-3-pro-image']) imageDefinitions[`google:${name}`] = { ...imageDefinitions['google:gemini-3.1-flash-image-preview']!, source: `https://ai.google.dev/gemini-api/docs/models/${name}` };
 imageDefinitions['google:gemini-nano-banana-2.1'] = {
   ...imageDefinitions['google:gemini-3.1-flash-image-preview']!,

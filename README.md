@@ -1,16 +1,21 @@
 # @baiq-bq/llmclient
 
+<a href="https://baiq.eu"><img src="https://baiq.eu/assets/baiq-logotipo-positivo-rgb.svg" alt="baiq" width="120"></a>
+
 A TypeScript client for Node.js 24+ built on the AI SDK. It supports text, validated objects, streaming, tools, image generation and editing, and per-attempt usage and cost. It works with OpenAI, Anthropic, Google Gemini, xAI, DeepSeek and Kimi, and includes an offline mock provider.
 
 Developed by BQ. [bq.land](https://bq.land) · [baiq.eu](https://baiq.eu)
 
 ## Install and run
 
-```bash
-npm install @baiq-bq/llmclient
-```
+| Package manager | Install the client | Add a provider SDK, for example OpenAI |
+| --- | --- | --- |
+| npm | `npm install @baiq-bq/llmclient` | `npm install @ai-sdk/openai` |
+| pnpm | `pnpm add @baiq-bq/llmclient` | `pnpm add @ai-sdk/openai` |
+| Yarn | `yarn add @baiq-bq/llmclient` | `yarn add @ai-sdk/openai` |
+| Bun | `bun add @baiq-bq/llmclient` | `bun add @ai-sdk/openai` |
 
-Save this as `example.mjs` and run `node example.mjs`. Mock mode works without a network connection or credentials.
+Use Node.js 24+ to run the examples, whichever package manager you use. Save this as `example.mjs` and run `node example.mjs` or `yarn node example.mjs` with Yarn Plug'n'Play. Mock mode works without a network connection or credentials.
 
 ```js
 import { createLlmClient, LanguageModel } from '@baiq-bq/llmclient';
@@ -23,7 +28,7 @@ const result = await client.generate({
 console.log(result.text, result.cost);
 ```
 
-For a live call, install the SDK used by the adapter. SDKs are optional peer dependencies. npm installs the ones you explicitly select. For example, run `npm install @ai-sdk/openai` and set `OPENAI_API_KEY` in the application environment.
+For a live call, install the SDK for your provider and configure its credentials. SDKs are optional peer dependencies. For the OpenAI example below, set `OPENAI_API_KEY` in the application environment.
 
 ```js
 import { createLlmClient, LanguageModel } from '@baiq-bq/llmclient';
@@ -55,7 +60,7 @@ mkdir -p .agents/skills
 cp -R node_modules/@baiq-bq/llmclient/skills/llmclient .agents/skills/
 ```
 
-Refresh a copied skill when you upgrade the package. The repository's maintainer rules are separate from this consumer skill. [View the skill on GitHub](https://github.com/baiq-bq/llmclient/tree/main/skills/llmclient)
+With Yarn Plug'n'Play, run `yarn unplug @baiq-bq/llmclient` and copy the skill from the package directory under `.yarn/unplugged`. Refresh a copied skill when you upgrade the package. The repository's maintainer rules are separate from this consumer skill. [View the skill on GitHub](https://github.com/baiq-bq/llmclient/tree/main/skills/llmclient)
 
 ## Providers and model selection
 

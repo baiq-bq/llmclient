@@ -5,7 +5,7 @@ description: Integrate or troubleshoot @baiq-bq/llmclient in a Node.js backend. 
 
 # Use llmclient
 
-- Use Node.js 24 or newer. Install only the SDK for each provider the application imports. See [models and adapters](references/models.md).
+- Use Node.js 24 or newer. Install only the SDK for each provider the application imports. See [models and adapters](references/models.md) and the [installation commands](https://github.com/baiq-bq/llmclient#install-and-run) for npm, pnpm, Yarn and Bun.
 - Select a `LanguageModel` for text, structured output and streaming, or an `ImageModel` for image generation and editing. Check `client.listModels()` for capabilities and configuration. Provider access still depends on the account.
 - Pass provider credentials explicitly from the application's secret configuration. Use `mock` for examples and tests that do not require a live provider.
 - Preserve `usage`, `cost` and `entries` separately from visible output. A partial amount is a subtotal, and an unknown amount is not zero.
@@ -25,7 +25,7 @@ console.log(result.text, result.cost);
 
 ## Validate a real provider response
 
-Run `npm install @ai-sdk/openai zod` and supply `OPENAI_API_KEY`.
+Add `@ai-sdk/openai` and `zod` with your package manager and supply `OPENAI_API_KEY`.
 
 ```js
 import { createLlmClient, LanguageModel } from '@baiq-bq/llmclient';

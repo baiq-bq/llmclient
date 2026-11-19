@@ -12,7 +12,7 @@ Developed by BQ. [bq.land](https://bq.land) · [baiq.eu](https://baiq.eu)
 | --- | --- | --- |
 | npm | `npm install @baiq-bq/llmclient` | `npm install @ai-sdk/openai` |
 | pnpm | `pnpm add @baiq-bq/llmclient` | `pnpm add @ai-sdk/openai` |
-| Yarn | `yarn add @baiq-bq/llmclient` | `yarn add @ai-sdk/openai` |
+| Yarn | `yarn add @baiq-bq/llmclient` | `yarn add @ai-sdk/openai zod` |
 | Bun | `bun add @baiq-bq/llmclient` | `bun add @ai-sdk/openai` |
 
 Use Node.js 24+ to run the examples, whichever package manager you use. Save this as `example.mjs` and run `node example.mjs` or `yarn node example.mjs` with Yarn Plug'n'Play. Mock mode works without a network connection or credentials.
@@ -28,7 +28,7 @@ const result = await client.generate({
 console.log(result.text, result.cost);
 ```
 
-For a live call, install the SDK for your provider and configure its credentials. SDKs are optional peer dependencies. For the OpenAI example below, set `OPENAI_API_KEY` in the application environment.
+For a live call, install the SDK for your provider and configure its credentials. SDKs are optional peer dependencies. With Yarn Plug'n'Play, declare the SDK's required peers in your application, such as `zod` for OpenAI. For the example below, set `OPENAI_API_KEY` in the application environment.
 
 ```js
 import { createLlmClient, LanguageModel } from '@baiq-bq/llmclient';

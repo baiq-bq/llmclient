@@ -5,6 +5,11 @@ const usage: Usage = { inputTokens: 1_000_000, uncachedInputTokens: 700_000, cac
 const id = LanguageModel.ClaudeSonnet5;
 describe('pricing', () => {
   it.each([
+    [LanguageModel.GPT62Astra, 272_000, 8, 40, 0.4, 10],
+    [LanguageModel.GPT62Astra, 272_001, 16, 60, 0.8, 20],
+    [LanguageModel.GPT62Sol, 272_000, 2, 10, 0.1, 2.5],
+    [LanguageModel.GPT62Sol, 272_001, 4, 15, 0.2, 5],
+    [LanguageModel.Gemini4Neon, 500_000, 3, 15, 0.15, undefined],
     [LanguageModel.GPT61Terra, 272_000, 1, 5, 0.05, 1.25],
     [LanguageModel.GPT61Terra, 272_001, 2, 7.5, 0.1, 2.5],
     [LanguageModel.ClaudeHaiku55, 100_000, 0.1, 0.5, 0.01, 0.125],

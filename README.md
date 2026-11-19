@@ -1,4 +1,4 @@
-# @baiq/llmclient
+# @baiq-bq/llmclient
 
 Cliente TypeScript para backend **Node.js ≥24**, basado en AI SDK. Unifica texto, objetos validados, streaming, herramientas y generación/edición de imágenes. Incluye adaptadores para OpenAI, Anthropic, Google Gemini, xAI, DeepSeek y Kimi (Moonshot AI), un modelo `mock` sin red ni coste, y registro de proveedores/modelos externos.
 
@@ -6,40 +6,61 @@ Puedes instalar el mismo paquete en tantos proyectos como necesites, incluso fue
 
 Cada cliente tiene configuración y tarifas independientes. El paquete no lee variables de entorno, no convierte documentos y no registra automáticamente credenciales, prompts, respuestas ni cuerpos del proveedor.
 
-## Instalación pública
+## Instalación
 
-En el `.npmrc` del proyecto consumidor, configura el scope para el registro público de Google Cloud:
-
-```ini
-@baiq:registry=https://europe-west1-npm.pkg.dev/baiq-459807/llmclient-public/
-```
-
-Después instala el cliente y el adaptador que necesites. No se requieren credenciales de Google Cloud para descargarlo:
+Con Node.js 24 o posterior, instala el paquete desde npm sin credenciales ni configuración de registro:
 
 ```bash
-npm install @baiq/llmclient @ai-sdk/openai zod
+npm install @baiq-bq/llmclient
 ```
 
-El scope `@baiq` solo puede apuntar a un registro en cada proyecto. Si también usas paquetes privados del mismo scope, conserva su configuración privada y gestiona esta dependencia según las necesidades de tu proyecto. Los SDK de proveedores son **peer dependencies opcionales**:
+Puedes probarlo sin llamar a ningún proveedor. Guarda esto como `ejemplo.mjs` y ejecuta `node ejemplo.mjs`.
+
+```js
+import { createLlmClient, LanguageModel } from '@baiq-bq/llmclient';
+
+const client = createLlmClient({ providers: [], mock: { text: 'Hola desde llmclient' } });
+const respuesta = await client.generate({
+  model: LanguageModel.Mock,
+  messages: [{ role: 'user', content: 'Hola' }],
+});
+console.log(respuesta.text, respuesta.cost);
+```
+
+Para llamar a un modelo real instala el SDK de ese proveedor. Los SDK son dependencias opcionales y se importan por separado. Por ejemplo, para OpenAI:
 
 ```bash
-npm install @ai-sdk/anthropic @ai-sdk/google @ai-sdk/xai @ai-sdk/deepseek @ai-sdk/moonshotai
+npm install @ai-sdk/openai
 ```
 
-La lectura es pública; para llamar a un proveedor real sigues necesitando sus propias credenciales. El modelo `mock` no las necesita.
+```js
+import { createLlmClient, LanguageModel } from '@baiq-bq/llmclient';
+import { openaiAdapter } from '@baiq-bq/llmclient/providers/openai';
 
-Disponibles entradas ESM y CommonJS con declaraciones TypeScript. Las subrutas de proveedores evitan cargar SDK que no utilices.
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) throw new Error('Configura OPENAI_API_KEY antes de ejecutar el ejemplo');
+const client = createLlmClient({ providers: [openaiAdapter({ apiKey })] });
+const respuesta = await client.generate({
+  model: LanguageModel.GPT62Sol,
+  messages: [{ role: 'user', content: 'Explícame qué es una API en una frase.' }],
+});
+console.log(respuesta.text, respuesta.cost);
+```
+
+Para los demás adaptadores instala `@ai-sdk/anthropic`, `@ai-sdk/google`, `@ai-sdk/xai`, `@ai-sdk/deepseek` o `@ai-sdk/moonshotai`, según el proveedor. Si vas a definir esquemas con `generateObject`, instala también `zod`. El paquete admite ESM y CommonJS e incluye declaraciones TypeScript.
+
+Si ya instalas `@baiq/llmclient` desde Google Artifact Registry, puedes seguir usando ese nombre. Sustituye `@baiq-bq/llmclient` por `@baiq/llmclient` en los imports.
 
 ## Crear un cliente y elegir modelos sin errores de escritura
 
 ```ts
-import { createLlmClient, LanguageModel, ImageModel, Provider } from '@baiq/llmclient';
-import { openaiAdapter } from '@baiq/llmclient/providers/openai';
-import { anthropicAdapter } from '@baiq/llmclient/providers/anthropic';
-import { googleAdapter } from '@baiq/llmclient/providers/google';
-import { xaiAdapter } from '@baiq/llmclient/providers/xai';
-import { deepseekAdapter } from '@baiq/llmclient/providers/deepseek';
-import { kimiAdapter } from '@baiq/llmclient/providers/kimi';
+import { createLlmClient, LanguageModel, ImageModel, Provider } from '@baiq-bq/llmclient';
+import { openaiAdapter } from '@baiq-bq/llmclient/providers/openai';
+import { anthropicAdapter } from '@baiq-bq/llmclient/providers/anthropic';
+import { googleAdapter } from '@baiq-bq/llmclient/providers/google';
+import { xaiAdapter } from '@baiq-bq/llmclient/providers/xai';
+import { deepseekAdapter } from '@baiq-bq/llmclient/providers/deepseek';
+import { kimiAdapter } from '@baiq-bq/llmclient/providers/kimi';
 
 // Las credenciales las obtiene TU aplicación; el paquete siempre las recibe explícitamente.
 const client = createLlmClient({
@@ -52,7 +73,7 @@ const client = createLlmClient({
     kimiAdapter({ apiKey: process.env.MOONSHOT_API_KEY! }),
   ],
   defaults: {
-    model: LanguageModel.GPT61Sol,
+    model: LanguageModel.GPT62Sol,
     timeoutMs: 60_000,
     maxOutputTokens: 4096,
     maxSteps: 5,
@@ -62,7 +83,7 @@ const client = createLlmClient({
 });
 
 const provider = Provider.OpenAI;        // 'openai'
-const model = LanguageModel.GPT61Sol;   // 'openai:gpt-6.1-sol'
+const model = LanguageModel.GPT62Sol;   // 'openai:gpt-6.2-sol'
 const imageModel = ImageModel.GPTImage26Sunburst;
 console.log(client.listModels());       // capacidades, fuentes y proveedores configurados
 ```
@@ -73,7 +94,7 @@ console.log(client.listModels());       // capacidades, fuentes y proveedores co
 
 ```ts
 const answer = await client.generate({
-  model: LanguageModel.GPT61Sol,
+  model: LanguageModel.GPT62Sol,
   system: 'Responde en español con frases breves.',
   messages: [{ role: 'user', content: '¿Qué es una API?' }],
   reasoning: { effort: 'low' },
@@ -85,7 +106,7 @@ console.log(answer.cost);
 // Conservar los mensajes completos incluye llamadas/resultados de herramientas
 // y los metadatos necesarios para continuar una conversación.
 const followup = await client.generate({
-  model: LanguageModel.GPT61Sol,
+  model: LanguageModel.GPT62Sol,
   messages: [
     { role: 'user', content: '¿Qué es una API?' },
     ...answer.messages,
@@ -98,7 +119,7 @@ Forma de respuesta (ejemplo ilustrativo; texto y consumo reales varían):
 
 ```ts
 {
-  model: 'openai:gpt-6.1-sol',
+  model: 'openai:gpt-6.2-sol',
   provider: 'openai',
   text: 'Una API permite que dos programas intercambien datos.',
   finishReason: 'stop',
@@ -133,7 +154,7 @@ Forma de respuesta (ejemplo ilustrativo; texto y consumo reales varían):
 
 ## DeepSeek: texto, JSON, streaming y herramientas
 
-Instala el peer opcional `@ai-sdk/deepseek` e importa `deepseekAdapter` desde `@baiq/llmclient/providers/deepseek`. La aplicación pasa su clave explícitamente; no hace falta instalar el SDK de OpenAI. Se usa Chat Completions nativo (`https://api.deepseek.com/chat/completions`), que conserva `reasoning_content` en las conversaciones y pasos de herramientas. `baseURL`, `headers` y `fetch` son configurables como en los demás adaptadores.
+Instala el peer opcional `@ai-sdk/deepseek` e importa `deepseekAdapter` desde `@baiq-bq/llmclient/providers/deepseek`. La aplicación pasa su clave explícitamente; no hace falta instalar el SDK de OpenAI. Se usa Chat Completions nativo (`https://api.deepseek.com/chat/completions`), que conserva `reasoning_content` en las conversaciones y pasos de herramientas. `baseURL`, `headers` y `fetch` son configurables como en los demás adaptadores.
 
 ```ts
 const deepseek = createLlmClient({
@@ -170,7 +191,7 @@ Se conserva la entrada cacheada por separado y el reasoning ya incluido en outpu
 
 ## Kimi: K3.1 Pro, Highspeed y K3
 
-Instala `@ai-sdk/moonshotai` ≥3.0.79 e importa `kimiAdapter` desde `@baiq/llmclient/providers/kimi`. Usa Chat Completions directo (`https://api.moonshot.ai/v1/chat/completions`), con clave explícita y `baseURL`, `headers` y `fetch` configurables. El identificador del proveedor en el paquete es `Provider.Kimi` (`kimi`); las opciones específicas del SDK usan `providerOptions.moonshotai`.
+Instala `@ai-sdk/moonshotai` ≥3.0.79 e importa `kimiAdapter` desde `@baiq-bq/llmclient/providers/kimi`. Usa Chat Completions directo (`https://api.moonshot.ai/v1/chat/completions`), con clave explícita y `baseURL`, `headers` y `fetch` configurables. El identificador del proveedor en el paquete es `Provider.Kimi` (`kimi`); las opciones específicas del SDK usan `providerOptions.moonshotai`.
 
 ```ts
 const kimi = createLlmClient({
@@ -288,7 +309,7 @@ PDF se admite en los modelos de texto del catálogo de OpenAI, Anthropic y Googl
 
 ```ts
 const contract = await client.generate({
-  model: LanguageModel.GPT61Sol,
+  model: LanguageModel.GPT62Sol,
   files: [{
     bytes: await readFile('./contrato.docx'),
     mediaType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -305,7 +326,7 @@ OpenAI Responses recibe DOCX directamente con `input_file`, igual que DOC, TXT, 
 ## Error de entrada incompatible y modelos alternativos
 
 ```ts
-import { LlmError } from '@baiq/llmclient';
+import { LlmError } from '@baiq-bq/llmclient';
 
 try {
   await client.generate({
@@ -325,7 +346,7 @@ try {
     //   reasons: ['unsupported_media_type'],
     //   validModels: [
     //     { model: 'openai:gpt-6-astra', configured: true },
-    //     { model: 'openai:gpt-6.1-sol', configured: true },
+    //     { model: 'openai:gpt-6.2-sol', configured: true },
     //     { model: 'openai:gpt-6-luna', configured: true },
     //   ],
     // }
@@ -412,10 +433,10 @@ Las referencias también funcionan con los modelos de imagen OpenAI y Google del
 ## Herramientas automáticas
 
 ```ts
-import { tool } from '@baiq/llmclient';
+import { tool } from '@baiq-bq/llmclient';
 
 const quote = await client.generate({
-  model: LanguageModel.GPT61Sol,
+  model: LanguageModel.GPT62Sol,
   messages: [{ role: 'user', content: '¿Cuánto cuesta el producto P-42?' }],
   maxSteps: 5,
   tools: {
@@ -451,7 +472,7 @@ Desde el segundo intento se envían esos diagnósticos al mismo modelo. Una sali
 const priced = createLlmClient({
   providers: [openaiAdapter({ apiKey: process.env.OPENAI_API_KEY! })],
   pricing: {
-    [LanguageModel.GPT61Sol]: {
+    [LanguageModel.GPT62Sol]: {
       rates: { input: 1.8, cachedInput: 0 }, // output/cacheWrite heredan la tabla interna
       longContext: { rates: { input: 3.6, cachedInput: 0 } },
       source: 'Contrato de mi organización', version: '2026-10-27',
@@ -480,14 +501,16 @@ Esta tarifa cubre la llamada completa; no se suman además sus tokens. Ajusta tu
 
 `cost.status` es `known`, `partial` o `unknown`. `estimatedUsd` es el subtotal conocido; `null` significa que no se conoce ningún componente facturable. Una llamada fallida sin consumo reportado impide presentar la factura total como completa. `entries[].cost.missing` explica qué falta y `appliedPricing.origins` indica `internal`/`custom` por campo. Caché de lectura se descuenta de la entrada normal; caché de escritura se cobra aparte cuando se reporta.
 
-Las tarifas internas son una instantánea de **2026-11-16** de procesamiento estándar/global bajo demanda. No incluyen impuestos, almacenamiento de caché, herramientas alojadas, descuentos Batch/Flex ni recargos regionales/Priority/Fast. Anthropic usa escritura de caché de cinco minutos; si seleccionas una hora, debes sobrescribir esa tarifa. Gemini 4 Argon y Carbon usan precios introductorios hasta 2026-11-30: desde 2026-12-01, input/output/caché pasan de 2/10/0,10 a 4/20/0,20 USD por millón. Google 3.8/3.7/3.6 tiene precios introductorios hasta 2026-12-31: actualiza la tabla para operaciones posteriores. No hay descubrimiento automático de precios ni modelos al arrancar.
+Las tarifas internas son una instantánea de **2026-11-19** de procesamiento estándar/global bajo demanda. No incluyen impuestos, almacenamiento de caché, herramientas alojadas, descuentos Batch/Flex ni recargos regionales/Priority/Fast. Anthropic usa escritura de caché de cinco minutos; si seleccionas una hora, debes sobrescribir esa tarifa. Gemini 4 Argon y Carbon usan precios introductorios hasta 2026-11-30: desde 2026-12-01, input/output/caché pasan de 2/10/0,10 a 4/20/0,20 USD por millón. Google 3.8/3.7/3.6 tiene precios introductorios hasta 2026-12-31: actualiza la tabla para operaciones posteriores. No hay descubrimiento automático de precios ni modelos al arrancar.
 
 ## Tabla de modelos y costes de texto
 
-Tarifas internas estándar en USD por millón de tokens, verificadas el 16 de noviembre de 2026. Columnas: entrada, salida, lectura de caché y escritura de caché (cinco minutos para Anthropic). «—» indica que el paquete no dispone de una tarifa para ese concepto. Consulta las fuentes enlazadas: los tramos de contexto largo y condiciones especiales se describen bajo la tabla.
+Tarifas internas estándar en USD por millón de tokens, verificadas el 19 de noviembre de 2026. Columnas: entrada, salida, lectura de caché y escritura de caché (cinco minutos para Anthropic). «—» indica que el paquete no dispone de una tarifa para ese concepto. Consulta las fuentes enlazadas: los tramos de contexto largo y condiciones especiales se describen bajo la tabla.
 
 | Proveedor y modelos | Entrada | Salida | Caché lectura | Caché escritura |
 | --- | ---: | ---: | ---: | ---: |
+| OpenAI GPT-6.2 Astra | 8 | 40 | 0,4 | 10 |
+| OpenAI GPT-6.2 Sol | 2 | 10 | 0,1 | 2,5 |
 | OpenAI GPT-6 Astra | 10 | 50 | 1 | 12,5 |
 | OpenAI GPT-6.1 Sol | 2 | 10 | 0,1 | 2,5 |
 | OpenAI GPT-6.1 Terra | 1 | 5 | 0,05 | 1,25 |
@@ -501,6 +524,7 @@ Tarifas internas estándar en USD por millón de tokens, verificadas el 16 de no
 | Anthropic Claude Haiku 5.5 | 0,1 | 0,5 | 0,01 | 0,125 |
 | Anthropic Claude Haiku 4.5 | 1 | 5 | 0,1 | 1,25 |
 | Google Gemini 4 Carbon, 4 Argon | 2 | 10 | 0,1 | — |
+| Google Gemini 4 Neon | 3 | 15 | 0,15 | — |
 | Google Gemini 4 Hydrogen | 1,5 | 7,5 | 0,075 | — |
 | Google Gemini 3.8, 3.7, 3.6 Flash | 0,75 | 3,75 | 0,075 | — |
 | Google Gemini 3.5 Flash | 1,5 | 9 | 0,15 | — |
@@ -555,7 +579,7 @@ Opcionalmente `mock.generateObject(schema)` produce un objeto de forma dinámica
 ## Registrar un proveedor o modelo externo
 
 ```ts
-import { defineProvider } from '@baiq/llmclient';
+import { defineProvider } from '@baiq-bq/llmclient';
 import type { LanguageModel as SdkLanguageModel } from 'ai';
 
 // Obtén este modelo de cualquier proveedor compatible con AI SDK LanguageModel V4.
@@ -589,7 +613,7 @@ const response = await extended.generate({
 ```ts
 const controller = new AbortController();
 const pending = client.generate({
-  model: LanguageModel.GPT61Sol,
+  model: LanguageModel.GPT62Sol,
   messages: [{ role: 'user', content: 'Analiza este problema.' }],
   signal: controller.signal, timeoutMs: 30_000,
 });
@@ -609,12 +633,12 @@ Dos reintentos por defecto, con backoff y respeto de `Retry-After`. Los reintent
 
 ## Catálogo y fuentes oficiales
 
-Actualización de modelos contrastada el **2026-10-27**. Las nuevas capacidades y tarifas se verifican en las páginas enlazadas de cada proveedor. Gemini 4 Argon se limita a 65.536 tokens de salida síncrona: su long decode de hasta 1M requiere otro flujo. GPT‑6.1 Terra admite `low`, `medium`, `high`, `xhigh` y `max` en este paquete; `none` se rechaza porque el SDK lo descarta, aunque la API lo admite. Nano Banana 2.1 mantiene los límites conservadores de referencias de imagen del paquete. Se incorporan las últimas familias disponibles de generación de texto e imagen; también se mantienen alternativas activas. El catálogo es estático, tipado y ampliable. La presencia de un modelo no otorga acceso a una cuenta restringida ni convierte un preview en estable.
+Actualización de modelos contrastada el **2026-11-19**. Las nuevas capacidades y tarifas se verifican en las páginas enlazadas de cada proveedor. Los modelos Gemini 4 se limitan a 65.536 tokens de salida síncrona: su long decode de hasta 1M requiere otro flujo. Neon y Hydrogen admiten `xhigh` en la API, pero el SDK instalado no lo transporta y el paquete lo rechaza. GPT‑6.1 Terra admite `low`, `medium`, `high`, `xhigh` y `max` en este paquete; `none` se rechaza porque el SDK lo descarta, aunque la API lo admite. Nano Banana 2.1 mantiene los límites conservadores de referencias de imagen del paquete. Se incorporan las últimas familias disponibles de generación de texto e imagen; también se mantienen alternativas activas. El catálogo es estático, tipado y ampliable. La presencia de un modelo no otorga acceso a una cuenta restringida ni convierte un preview en estable.
 
-- **OpenAI texto:** `GPT6Astra`, `GPT61Sol`, `GPT61Terra`, `GPT6Luna`. Imagen: `GPTImage25Sunburst`, `GPTImage25Flare`, `GPTImage2`. [Catálogo](https://developers.openai.com/api/docs/models), [precios](https://developers.openai.com/api/docs/pricing), [archivos](https://developers.openai.com/api/docs/guides/file-inputs).
-- **Anthropic texto:** `ClaudeFable51`, `ClaudeMythos51` (acceso restringido), `ClaudeOpus55`, `ClaudeSonnet55`, `ClaudeHaiku55`; alternativas `ClaudeHaiku45`, `ClaudeOpus5` y `ClaudeSonnet5`. No tiene generación de imágenes. [Modelos](https://platform.claude.com/docs/en/models/overview), [precios](https://platform.claude.com/docs/en/about-claude/pricing), [reasoning](https://platform.claude.com/docs/en/build-with-claude/effort).
-- **Google texto:** `Gemini4Argon`, `Gemini38Flash`, `Gemini37Flash`, `Gemini36Flash`, `Gemini35Flash`, `Gemini35FlashLite`, `Gemini31FlashLite`, `Gemini31ProPreview`, `Gemini3FlashPreview`. Imagen: `GeminiNanoBanana21`, `Gemini31FlashImage`, `Gemini31FlashLiteImage`, `Gemini3ProImage`; también el identificador anterior `Gemini31FlashImagePreview` para compatibilidad. [Modelos](https://ai.google.dev/gemini-api/docs/models), [precios](https://ai.google.dev/gemini-api/docs/pricing), [imágenes](https://ai.google.dev/gemini-api/docs/image-generation).
-- **xAI texto:** `Grok47`, `GrokBuild01`, `Grok46`, `Grok45`, `Grok43`, `Grok420Reasoning`, `Grok420NonReasoning`. Imagen: `GrokImagineImage2`, `GrokImagineImage`, `GrokImagineImageQuality` (retirada anunciada para 2026-11-02). Texto admite PNG/JPEG; las referencias de imagen de generación siguen su propio contrato. [Modelos](https://docs.x.ai/developers/models), [precios](https://docs.x.ai/developers/pricing).
+- **OpenAI texto:** `GPT62Astra`, `GPT62Sol`, `GPT6Astra`, `GPT61Sol`, `GPT61Terra`, `GPT6Luna`. Imagen: `GPTImage26Sunburst`, `GPTImage26Flare`, `GPTImage25Sunburst`, `GPTImage25Flare`, `GPTImage2` (obsoleto). [Catálogo](https://developers.openai.com/api/docs/models), [precios](https://developers.openai.com/api/docs/pricing), [archivos](https://developers.openai.com/api/docs/guides/file-inputs).
+- **Anthropic texto:** `ClaudeFable52`, `ClaudeMythos52` (acceso restringido), `ClaudeFable51`, `ClaudeMythos51` (acceso restringido), `ClaudeOpus55`, `ClaudeSonnet55`, `ClaudeHaiku55`; alternativas `ClaudeHaiku45`, `ClaudeOpus5` y `ClaudeSonnet5`. No tiene generación de imágenes. [Modelos](https://platform.claude.com/docs/en/models/overview), [precios](https://platform.claude.com/docs/en/about-claude/pricing), [reasoning](https://platform.claude.com/docs/en/build-with-claude/effort).
+- **Google texto:** `Gemini4Carbon`, `Gemini4Neon`, `Gemini4Hydrogen`, `Gemini4Argon`, `Gemini38Flash`, `Gemini37Flash`, `Gemini36Flash`, `Gemini35Flash`, `Gemini35FlashLite`, `Gemini31FlashLite`, `Gemini31ProPreview`, `Gemini3FlashPreview`. Imagen: `GeminiNanoBanana21`, `Gemini31FlashImage`, `Gemini31FlashLiteImage`, `Gemini3ProImage`; también el identificador anterior `Gemini31FlashImagePreview` para compatibilidad. [Modelos](https://ai.google.dev/gemini-api/docs/models), [precios](https://ai.google.dev/gemini-api/docs/pricing), [imágenes](https://ai.google.dev/gemini-api/docs/image-generation).
+- **xAI texto:** `Grok47`, `GrokBuild01`, `Grok46`, `Grok45`, `Grok43`, `Grok420Reasoning`, `Grok420NonReasoning`. Imagen: `GrokImagineImage2`, `GrokImagineImage`, `GrokImagineImageQuality` (retirado; redirigido desde 2026-11-02). Texto admite PNG/JPEG; las referencias de imagen de generación siguen su propio contrato. [Modelos](https://docs.x.ai/developers/models), [precios](https://docs.x.ai/developers/pricing).
 
 - **DeepSeek texto:** `DeepSeekFlash` (`deepseek-flash`, versión V4.1-Flash-1017) y `DeepSeekV4Pro` (`deepseek-v4-pro`, versión V4-Pro-0813). Flash admite imágenes; Pro solo texto. Los alias retirados `deepseek-chat`, `deepseek-reasoner` y `deepseek-v4-flash` no se añaden al catálogo. [Modelos y tarifas](https://api-docs.deepseek.com/quick_start/pricing/), [razonamiento](https://api-docs.deepseek.com/guides/thinking_mode/), [visión](https://api-docs.deepseek.com/guides/vision/), [JSON](https://api-docs.deepseek.com/guides/json_mode/), [herramientas](https://api-docs.deepseek.com/guides/thinking_mode/#tool-calls).
 
@@ -622,57 +646,6 @@ Actualización de modelos contrastada el **2026-10-27**. Las nuevas capacidades 
 
 Se excluyen endpoints de voz/Live, vídeo, embeddings, moderación, entrenamiento, multiagente alojado y ofertas especializadas con contrato de acceso/endpoint distinto. Los modelos retirados no se recomiendan. Para servicios especializados utiliza otro adaptador; este paquete no promete cubrir todos los endpoints de cada proveedor.
 
-## Cloud Build: publicación automática desde main
+## Desarrollo y releases
 
-Con el trigger de GitHub activado, cada push a `main` ejecuta `cloudbuild.yaml` mediante `llmclient-main-publish` de `baiq-459807`, región `europe-west1`. El pipeline instala dependencias, obtiene un token temporal, comprueba la versión, verifica tipos/build/imports y publica en el registro privado. **No ejecuta los tests unitarios**: son obligatorios en local antes de crear una PR y después del último cambio.
-
-La versión debe ser **mayor por precedencia SemVer que todas las versiones ya publicadas**, no solo distinta ni mayor que el dist-tag `latest`. `package.json` y las versiones raíz del lockfile deben coincidir. Una versión igual/inferior, credenciales inválidas o metadatos del registro no verificables hacen fallar el build; nunca se convierten en un skip exitoso. El gate se repite justo antes de publicar para detectar publicaciones concurrentes.
-
-Antes de crear cualquier PR, también si solo modifica documentación o CI:
-
-```bash
-git fetch origin main
-npm version patch --no-git-tag-version # minor/major si corresponde
-npm run check                         # tests obligatorios en local
-npm pack --dry-run --ignore-scripts
-npm run check:release -- --base origin/main
-```
-
-El último comando necesita acceso lector al registro y comprueba además que se haya incrementado respecto a la base de la PR. Si otra PR publica primero, actualiza la versión antes del merge. Un reintento del trigger sobre la misma versión publicada debe fallar. El trigger procesa el commit del evento de push; no publica por separado todos los commits intermedios enviados en un único push.
-
-La cuenta `llmclient-publisher@baiq-459807.iam.gserviceaccount.com` tiene writer únicamente sobre el repositorio npm y permiso de escritura de logs. No se entregan credenciales de publicación a builds de PR. La conexión dedicada `llmclient` usa la instalación existente de Cloud Build para `baiq-bq`; su credencial se guarda en Secret Manager y debe estar vigente. Con la conexión autorizada, `bash scripts/create-cloudbuild-trigger.sh` vincula el repositorio y crea el trigger sin cambiar las credenciales de ninguna conexión. No ejecutes ese script si el trigger ya existe; inspecciónalo con `gcloud builds triggers describe llmclient-main-publish --region=europe-west1 --project=baiq-459807`.
-
-Las [reglas del repositorio](https://github.com/baiq-bq/llmclient/blob/main/AGENTS.md) y la [skill de preparación/revisión de PRs](https://github.com/baiq-bq/llmclient/blob/main/.agents/skills/llmclient-pr-review/SKILL.md) exigen incremento de versión, pruebas locales y revisión de contratos, capacidades y costes. No publiques manualmente una versión que publicará el trigger del mismo commit; `publish:private` queda para operaciones manuales expresamente solicitadas.
-
-## Desarrollo, comprobación y publicación
-
-```bash
-npm ci
-npm run check                 # tipos, pruebas HTTP simuladas, build y ESM/CommonJS
-npm pack --dry-run            # revisar contenido del paquete
-npm run publish:private      # comprueba y publica usando autenticación temporal
-npm run check:private-install # instala la versión de package.json en un proyecto temporal
-```
-
-Las pruebas habituales no hacen llamadas de pago. Verifican payloads de los cuatro SDK, esquemas válidos/erróneos/truncados, capacidades, archivos, streaming, herramientas, caché, costes parciales, aislamiento, cancelación, plazo común y ausencia de ejecuciones duplicadas.
-
-El script de publicación verifica el destino, usa el token de la identidad autenticada en `gcloud`, lo escribe con permisos `0600` fuera del checkout y elimina la configuración temporal al terminar. No cambia el proyecto activo. El registro está fijado en `publishConfig` y en el scope `@baiq`; nunca se publica al registro público.
-
-Creación del repositorio estándar:
-
-```bash
-gcloud artifacts repositories create npm-private \
-  --repository-format=npm --location=europe-west1 --project=baiq-459807 \
-  --description='Private npm packages for baiq'
-```
-
-Para autorizar una aplicación consumidora, concede lectura únicamente sobre este repositorio, sustituyendo la identidad:
-
-```bash
-gcloud artifacts repositories add-iam-policy-binding npm-private \
-  --location=europe-west1 --project=baiq-459807 \
-  --member='serviceAccount:CONSUMER@baiq-459807.iam.gserviceaccount.com' \
-  --role='roles/artifactregistry.reader'
-```
-
-Un publicador necesita `roles/artifactregistry.writer`. No concedas `allUsers` ni `allAuthenticatedUsers`. [Autenticación npm en Google](https://docs.cloud.google.com/artifact-registry/docs/nodejs/authentication). Las versiones publicadas deben tratarse como inmutables: aumenta la versión antes de publicar cambios posteriores.
+Las pruebas locales usan HTTP simulado. Ejecuta `npm ci` y `npm run check` para comprobar tipos, pruebas, compilación e imports ESM/CommonJS. Consulta la [guía de releases](https://github.com/baiq-bq/llmclient/blob/main/docs/releases.md) para preparar una versión y seguir su publicación en npm.

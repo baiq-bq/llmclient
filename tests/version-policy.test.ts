@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getNpmRelease } from '../scripts/npm-release.mjs';
 import { assertPublicVersion } from '../scripts/public-release.mjs';
 import { assertReleaseVersion } from '../scripts/version-policy.mjs';
 const registry = 'https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/';
@@ -36,5 +37,28 @@ describe('public registry version gate', () => {
     expect(() => assertPublicVersion('0.4.1', 500)).toThrow();
     expect(() => assertPublicVersion('0.4.1', 200, { versions: {} })).toThrow();
     expect(() => assertPublicVersion('0.4.1', 200, { versions: { bad: {} } })).toThrow();
+  });
+});
+
+describe('public npm release', () => {
+  it('prepares the npm variant while preserving the original manifest', () => {
+    const { pkg, lock } = fixture('0.5.1');
+    expect(getNpmRelease(pkg, lock, ['0.5.0', '0.0.0-stage'], 'v0.5.1', false)).toMatchObject({
+      distTag: 'latest',
+      manifest: { name: '@baiq-bq/llmclient', version: '0.5.1', publishConfig: { registry: 'https://registry.npmjs.org/', access: 'public' } },
+    });
+    expect(pkg).toMatchObject({ name: '@baiq/llmclient', publishConfig: { registry } });
+  });
+
+  it('publishes a matching prerelease on next and rejects the stable flag', () => {
+    const { pkg, lock } = fixture('0.6.0-rc.1');
+    expect(getNpmRelease(pkg, lock, ['0.5.0'], 'v0.6.0-rc.1', true).distTag).toBe('next');
+    expect(() => getNpmRelease(pkg, lock, ['0.5.0'], 'v0.6.0-rc.1', false)).toThrow('prerelease flag');
+  });
+
+  it('blocks mismatched tags and releases below any published version', () => {
+    const { pkg, lock } = fixture('0.5.1');
+    expect(() => getNpmRelease(pkg, lock, ['0.5.0'], 'v0.5.2', false)).toThrow('exact package version');
+    expect(() => getNpmRelease(pkg, lock, ['0.5.0', '0.6.0-rc.1'], 'v0.5.1', false)).toThrow('has not increased');
   });
 });

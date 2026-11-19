@@ -15,12 +15,13 @@ describe('verified catalog transport compatibility', () => {
     for (const adapter of adapters) {
       expect(Object.keys(adapter.models!).map(id => `${adapter.id}:${id}`).sort()).toEqual(Object.keys(modelCatalog).filter(id => id.startsWith(`${adapter.id}:`)).sort());
     }
-    for (const model of Object.keys(modelCatalog)) expect(defaultPricing[model as keyof typeof defaultPricing]).toHaveProperty('version', '2026-11-16');
+    for (const model of Object.keys(modelCatalog)) expect(defaultPricing[model as keyof typeof defaultPricing]).toHaveProperty('version', '2026-11-19');
   });
   it('uses current rates for the latest Anthropic and Gemini models', () => {
     expect(defaultPricing[LanguageModel.ClaudeFable52]!.rates).toEqual({ input: 8, output: 40, cachedInput: 0.2, cacheWrite: 10 });
     expect(defaultPricing[LanguageModel.ClaudeMythos52]!.rates).toEqual(defaultPricing[LanguageModel.ClaudeFable52]!.rates);
     expect(defaultPricing[LanguageModel.ClaudeSonnet55]!.rates.cachedInput).toBe(0.1);
+    expect(defaultPricing[LanguageModel.Gemini4Neon]!.rates).toEqual({ input: 3, output: 15, cachedInput: 0.15 });
     expect(defaultPricing[LanguageModel.Gemini4Carbon]!.rates).toEqual({ input: 2, output: 10, cachedInput: 0.1 });
     expect(defaultPricing[LanguageModel.Gemini4Hydrogen]!.rates).toEqual({ input: 1.5, output: 7.5, cachedInput: 0.075 });
     expect(defaultPricing['xai:grok-imagine-image-quality']!.rates).toEqual({ image: 0.04, inputImage: 0.01 });
@@ -64,6 +65,8 @@ describe('verified catalog transport compatibility', () => {
   });
   it('rejects always-on thinking and unsupported xAI formats before transport', async () => {
     const send = vi.fn<typeof fetch>(); const client = createLlmClient({ providers: adapters, fetch: send });
+    await expect(client.generate({ model: LanguageModel.Gemini4Neon, messages, reasoning: { effort: 'xhigh' } })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+    await expect(client.generate({ model: LanguageModel.GPT62Astra, messages, reasoning: { effort: 'none' } })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
     await expect(client.generate({ model: LanguageModel.ClaudeOpus55, messages, reasoning: { effort: 'none' } })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
     // Terra's API accepts none, but the installed SDK drops it: reject before I/O.
     await expect(client.generate({ model: LanguageModel.GPT61Terra, messages, reasoning: { effort: 'none' } })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });

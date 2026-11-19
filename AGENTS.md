@@ -4,7 +4,7 @@ Estas instrucciones se aplican a todo el repositorio. Para preparar o revisar un
 
 ## Propósito y arquitectura
 
-- Paquete privado TypeScript para backend Node.js ≥24, basado en AI SDK. Mantener entradas ESM/CommonJS y declaraciones para ambas.
+- Paquete TypeScript para backend Node.js ≥24, basado en AI SDK. Mantener entradas ESM/CommonJS y declaraciones para ambas.
 - `src/client.ts`: orquestación; `types.ts`: contratos; `models.ts`/`catalog.ts`: identificadores, capacidades y tarifas; `pricing.ts`/`accounting.ts`: costes; `execution.ts`: plazo/reintentos; `images.ts`: imágenes; `providers/`: adaptadores opcionales.
 - Proveedores integrados: OpenAI, Anthropic, Google, xAI, DeepSeek y Kimi (Moonshot AI). No introducir dependencias de Editavia ni leer variables de entorno en el paquete; recibir configuración explícita.
 - Mantener tipos de modelos de texto/imagen separados. Los identificadores externos registrados con claves literales deben inferirse sin aceptar errores de escritura arbitrarios.
@@ -43,10 +43,16 @@ Estas instrucciones se aplican a todo el repositorio. Para preparar o revisar un
 - No editar una versión publicada ni saltarse el control de versión. No publicar manualmente una versión que vaya a publicarse por el trigger del mismo commit.
 - Usar ramas `codex/<nombre>` por defecto para PRs. Revisar y bloquear PRs sin incremento de versión o sin comprobaciones locales documentadas.
 
-## Publicación e infraestructura
+## Releases públicas en npm
+
+- El nombre en npmjs.org es `@baiq-bq/llmclient`. Solo una release de GitHub publicada desde un commit de `main` activa `.github/workflows/publish-npm.yml`, con un Trusted Publisher de npm.
+- La etiqueta debe ser `v` seguida de la versión exacta del manifiesto y lockfile. La versión debe superar todas las versiones del registro público. Las versiones estables publican con `latest` y las preliminares con `next`.
+- Mantener un README para usuarios en GitHub y npm. Las instrucciones de mantenimiento están en `docs/releases.md`.
+
+## Publicación en Google Artifact Registry
 
 - Proyecto: `baiq-459807`; región: `europe-west1`; repositorio npm estándar privado: `npm-private`; scope: `@baiq`.
-- Registro privado original: `https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/`. No publicar a npm público, no guardar tokens/keys en Git ni en el tarball.
+- Registro privado original: `https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/`. No guardar tokens/keys en Git ni en el tarball.
 - Trigger: `llmclient-main-publish`, GitHub `baiq-bq/llmclient`, push a `^main$`, configuración `cloudbuild.yaml`. No triggers de PR con permisos de publicación.
 - Conexión GitHub dedicada: `llmclient`, instalación existente de `baiq-bq`. Credencial OAuth en Secret Manager; no copiar tokens al repositorio. No modificar la conexión compartida `baiq`.
 - Cuenta de servicio dedicada: `llmclient-publisher@baiq-459807.iam.gserviceaccount.com`, writer sobre `npm-private` y `llmclient-public`, logWriter en el proyecto. El repositorio `llmclient-public` permite lectura a `allUsers` exclusivamente para distribuir este paquete; `npm-private` sigue privado.

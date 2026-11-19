@@ -2,6 +2,7 @@
 export const Provider = Object.freeze({ OpenAI: 'openai', Anthropic: 'anthropic', Google: 'google', XAI: 'xai', DeepSeek: 'deepseek', Kimi: 'kimi', Mock: 'mock' } as const);
 export type BuiltinProvider = typeof Provider[keyof typeof Provider];
 export const LanguageModel = Object.freeze({
+  GPT62Astra: 'openai:gpt-6.2-astra', GPT62Sol: 'openai:gpt-6.2-sol', Gemini4Neon: 'google:gemini-4-neon',
   ClaudeFable52: 'anthropic:claude-fable-5-2', ClaudeMythos52: 'anthropic:claude-mythos-5-2', Gemini4Carbon: 'google:gemini-4-carbon', Gemini4Hydrogen: 'google:gemini-4-hydrogen',
   KimiK31Pro: 'kimi:kimi-k3.1-pro', KimiK31ProHighspeed: 'kimi:kimi-k3.1-pro-highspeed', KimiK3: 'kimi:kimi-k3',
   GPT61Terra: 'openai:gpt-6.1-terra', ClaudeHaiku55: 'anthropic:claude-haiku-5-5', Gemini4Argon: 'google:gemini-4-argon',

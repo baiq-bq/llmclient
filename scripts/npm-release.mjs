@@ -40,9 +40,16 @@ async function packRelease(tag, prerelease, destination) {
     writeFileSync(join(staging, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     cpSync('dist', join(staging, 'dist'), { recursive: true });
     cpSync('README.md', join(staging, 'README.md'));
+    cpSync('LICENSE', join(staging, 'LICENSE'));
+    mkdirSync(join(staging, 'skills'));
+    cpSync('skills/llmclient', join(staging, 'skills/llmclient'), { recursive: true });
     const [result] = JSON.parse(run('npm', ['pack', './package', '--ignore-scripts', '--json'], {
       cwd: directory, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8',
     }));
+    const paths = new Set(result.files.map(file => file.path));
+    for (const path of ['README.md', 'LICENSE', 'skills/llmclient/SKILL.md', 'skills/llmclient/references/models.md']) {
+      if (!paths.has(path)) throw new Error(`The npm archive is missing ${path}.`);
+    }
     const output = resolve(destination);
     mkdirSync(output, { recursive: true });
     copyFileSync(join(directory, result.filename), join(output, 'llmclient.tgz'));

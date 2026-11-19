@@ -1,8 +1,12 @@
 {
   "name": "@baiq/llmclient",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Configurable multi-provider LLM client with usage accounting, pricing overrides, tools and streaming",
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "author": {
+    "name": "BQ",
+    "url": "https://bq.land"
+  },
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -16,7 +20,9 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "skills/llmclient"
   ],
   "sideEffects": false,
   "exports": {

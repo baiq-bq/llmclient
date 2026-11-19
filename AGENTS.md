@@ -1,62 +1,34 @@
-# Reglas de @baiq/llmclient
+# llmclient maintainer instructions
 
-Estas instrucciones se aplican a todo el repositorio. Para preparar o revisar una PR, lee y aplica [llmclient-pr-review](.agents/skills/llmclient-pr-review/SKILL.md).
+These instructions apply to the entire repository. When preparing or reviewing a pull request, follow the [llmclient PR review skill](.agents/skills/llmclient-pr-review/SKILL.md). The [consumer skill](skills/llmclient/SKILL.md) ships with the package and is maintained separately from these instructions.
 
-## Propósito y arquitectura
+## Architecture and behavior
 
-- Paquete TypeScript para backend Node.js ≥24, basado en AI SDK. Mantener entradas ESM/CommonJS y declaraciones para ambas.
-- `src/client.ts`: orquestación; `types.ts`: contratos; `models.ts`/`catalog.ts`: identificadores, capacidades y tarifas; `pricing.ts`/`accounting.ts`: costes; `execution.ts`: plazo/reintentos; `images.ts`: imágenes; `providers/`: adaptadores opcionales.
-- Proveedores integrados: OpenAI, Anthropic, Google, xAI, DeepSeek y Kimi (Moonshot AI). No introducir dependencias de Editavia ni leer variables de entorno en el paquete; recibir configuración explícita.
-- Mantener tipos de modelos de texto/imagen separados. Los identificadores externos registrados con claves literales deben inferirse sin aceptar errores de escritura arbitrarios.
-- `mock` existe para texto, objetos, streaming e imágenes: sin red, credenciales ni coste; validar esquemas y no ejecutar herramientas reales.
+- Maintain Node.js 24+, ESM and CommonJS entry points, and declarations for both. The supported providers are OpenAI, Anthropic, Google, xAI, DeepSeek and Kimi. Keep each SDK an optional peer dependency and let callers choose which adapters to install.
+- `src/client.ts` orchestrates requests, `types.ts` defines contracts, `models.ts` and `catalog.ts` define the catalog, `pricing.ts` and `accounting.ts` handle costs, `execution.ts` handles deadlines and retries, `images.ts` handles image generation, and `providers/` contains the optional adapters.
+- Keep image and text model types separate. Infer literal IDs for registered external models without accepting arbitrary misspellings. Accept explicit configuration and keep the package independent of Editavia and environment variables.
+- Validate operations, reasoning, tools, MIME type and file limits before I/O. Return stable `LlmError` codes and structured alternatives with provider configuration status. Send files directly, without conversion, extraction or silent model substitution.
+- Validate completed objects with Zod. Stream fragments are provisional. Tools require a description, schema and execute function. Default to five steps and propagate `AbortSignal`. Never restart after tools have run or stream events have been emitted.
+- Keep one deadline across calls, backoff and tools. Disable SDK retries and keep the client policy of two retries by default, with object repair from the second attempt. Preserve known usage across failed attempts and steps. Never log secrets, prompts, responses or private provider bodies automatically.
+- Keep `mock` local, free and available for text, objects, streaming and images. Validate mock objects and never execute real tools.
 
-## Invariantes de ejecución
+## Required model, pricing and documentation review
 
-- Validar operación, reasoning, herramientas, MIME, cantidad y tamaño antes de cualquier I/O. Un rechazo devuelve `LlmError` con código estable, motivos y modelos alternativos estructurados, indicando proveedores configurados.
-- Enviar archivos directamente; no extraer ni convertir PDF/DOCX automáticamente, no cambiar de modelo a escondidas. La compatibilidad depende del modelo y de la ruta implementada por el adaptador.
-- Los objetos solo son válidos tras validar el resultado final con Zod. Un fragmento de streaming no es un objeto válido.
-- Herramientas con descripción/esquema/execute, máximo predeterminado de cinco pasos. No repetir una operación después de ejecutar herramientas o emitir eventos. Propagar AbortSignal a las dependencias.
-- Un solo plazo incluye llamadas, backoff y herramientas. SDK con `maxRetries: 0`; política propia con dos reintentos por defecto y reparación de objetos desde el segundo intento.
-- Conservar consumo conocido de intentos/pasos anteriores, incluso al fallar. No registrar secretos, prompts, respuestas o cuerpos privados automáticamente.
+- **For every update, including documentation and CI changes, review each provider's official model catalog and pricing. Repeat or refresh that check against the final commit before every release.** Check for new model IDs, capabilities, deprecations and new or scheduled rates, including context thresholds, cache reads and writes, and image pricing. Record the source URLs, review date and outcome in the release or PR notes. If sources are unavailable, report the limitation and complete the review before publishing.
+- Apply verified changes in `src/models.ts`, `src/catalog.ts` and the relevant adapters. Keep exported constants, the catalogs and simulated SDK payload tests in sync. Differentiate stable, preview, restricted and retired models. Document conservative package limits and scheduled price changes. Preserve existing IDs when possible and never silently redirect a request to a different model.
+- Keep the English README and pricing tables, compiled examples, release guide, consumer skill and maintainer skill aligned with behavior and available models. Review the consumer skill's example imports, recommendations and packaged references on every release, even when it needs no changes.
+- Use USD per million tokens or USD per image. Allow per-model, per-field and per-tier overrides, including zero, and isolate client configuration. Deduct cached input from ordinary input, account for reported cache writes and avoid double-charging reasoning already in output. When pricing or usage is missing, preserve the known subtotal and report partial or unknown cost. Nonstandard region, retention, tier, quality and resolution can require overrides.
 
-## Modelos y costes
+## Tests and versioning
 
-- Verificar nuevos modelos, capacidades y precios en documentación oficial. Guardar fuente/fecha, diferenciar preview, acceso restringido, modelos retirados y límites conservadores del paquete.
-- Mantener sincronizados constantes exportadas, catálogos y adaptadores. Añadir pruebas de payloads de SDK simulados.
-- Tarifas de tokens en USD/millón; tarifas de imágenes en USD/imagen. Sobrescribir por modelo/campo y tramo; `0` es válido. Aislar la configuración de cada cliente.
-- Descontar entrada cacheada y contemplar escritura reportada. Reasoning incluido en output no se cobra dos veces.
-- Si falta consumo/precio, devolver coste parcial/desconocido y subtotal conocido; no inventar un precio cero. Calidad, resolución, caché de una hora, región y tiers especiales pueden necesitar una tarifa externa.
-- Actualizar README y ejemplos compilables al cambiar API, modelos, capacidades o formas de respuesta.
+- Maintain `tests/*.test.ts` for changes in behavior, including release tooling. Test with simulated HTTP or SDKs. Before a PR or release, after the final change run `npm ci`, `npm run check` and `npm pack --dry-run --ignore-scripts`. Verify the public archive also contains the license, README, skill and references. Report real outcomes and any checks you could not run.
+- Unit tests run locally. CI uses `npm run check:ci` for types, builds and ESM/CommonJS imports. Keep paid provider calls out of routine tests.
+- Increment the version in `package.json` and both root entries in `package-lock.json` before opening a PR, including documentation or CI changes. Use a SemVer increment greater than the base and all published versions. Build metadata is not a version increment. Never overwrite a published version or bypass the gates.
+- Run `git fetch origin main` and `npm run check:release -- --base origin/main` with access to the internal registry. Recheck after rebases and concurrent releases. Use `codex/<name>` for PR branches by default. Block PRs without an increment or documented local checks.
 
-## Tests y comprobación obligatoria en local
+## Publication
 
-- Los tests unitarios son obligatorios: conservar y ampliar `tests/*.test.ts` para todo cambio de comportamiento, incluido el control de versiones/publicación. Usar transporte simulado; ninguna llamada de pago en tests habituales.
-- Antes de una PR y después del último cambio, ejecutar `npm ci`, `npm run check` y `npm pack --dry-run --ignore-scripts`. Si falla, reparar y repetir los checks afectados antes de presentar la PR.
-- `npm run check` ejecuta tipos, tests unitarios, build y comprobaciones de imports ESM/CommonJS. Informar comandos/resultados y cualquier comprobación no realizada; nunca afirmar un pase sin evidencia.
-- **Los tests unitarios no se ejecutan en CI.** No añadir `npm test`, Vitest ni `npm run check` al Cloud Build. CI utiliza `npm run check:ci` (tipos, build e imports).
-
-## Versiones y PRs
-
-- **Antes de crear una PR hay que incrementar la versión** de `package.json` y `package-lock.json`. También para documentación, reglas o CI: cada push a main intenta publicar.
-- La nueva versión SemVer debe ser mayor que la base actual de la PR y que todas las versiones publicadas. `npm version patch --no-git-tag-version` es lo habitual; usar minor/major según compatibilidad. Los metadatos `+build` no aumentan precedencia.
-- Ejecutar `git fetch origin main` y `npm run check:release -- --base origin/main` con acceso lector al registro. Tras un rebase o publicación concurrente, revisar de nuevo la versión.
-- No editar una versión publicada ni saltarse el control de versión. No publicar manualmente una versión que vaya a publicarse por el trigger del mismo commit.
-- Usar ramas `codex/<nombre>` por defecto para PRs. Revisar y bloquear PRs sin incremento de versión o sin comprobaciones locales documentadas.
-
-## Releases públicas en npm
-
-- El nombre en npmjs.org es `@baiq-bq/llmclient`. Solo una release de GitHub publicada desde un commit de `main` activa `.github/workflows/publish-npm.yml`, con un Trusted Publisher de npm.
-- La etiqueta debe ser `v` seguida de la versión exacta del manifiesto y lockfile. La versión debe superar todas las versiones del registro público. Las versiones estables publican con `latest` y las preliminares con `next`.
-- Mantener un README para usuarios en GitHub y npm. Las instrucciones de mantenimiento están en `docs/releases.md`.
-
-## Publicación en Google Artifact Registry
-
-- Proyecto: `baiq-459807`; región: `europe-west1`; repositorio npm estándar privado: `npm-private`; scope: `@baiq`.
-- Registro privado original: `https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/`. No guardar tokens/keys en Git ni en el tarball.
-- Trigger: `llmclient-main-publish`, GitHub `baiq-bq/llmclient`, push a `^main$`, configuración `cloudbuild.yaml`. No triggers de PR con permisos de publicación.
-- Conexión GitHub dedicada: `llmclient`, instalación existente de `baiq-bq`. Credencial OAuth en Secret Manager; no copiar tokens al repositorio. No modificar la conexión compartida `baiq`.
-- Cuenta de servicio dedicada: `llmclient-publisher@baiq-459807.iam.gserviceaccount.com`, writer solo sobre `npm-private` y logWriter en el proyecto. La distribución pública se realiza en npmjs.org.
-- Cloud Build: npm ci → token temporal → gate SemVer/lockfile contra todas las versiones del registro → tipos/build/imports → repetir gate y publicar en privado. Una versión repetida o inferior es **error**, no skip ni éxito. Errores de auth/red/metadatos también bloquean publicación.
-- El gate final protege frente a builds concurrentes; npm puede rechazar un conflicto de publicación y no debe ocultarse. No prometer una publicación por cada commit intermedio de un push: el trigger procesa el commit recibido por el evento GitHub.
-- Comandos gcloud siempre con proyecto/región explícitos; no cambiar el proyecto activo ni alterar conexiones/triggers de otros servicios.
-- El script manual `publish:private` ejecuta checks locales y usa gcloud; el script CI no llama tests ni gcloud desde el contenedor Node. Los tokens temporales se eliminan al finalizar.
+- The public package is `@baiq-bq/llmclient` on npmjs.org. A GitHub release from `main` with a tag matching `v<version>` triggers `.github/workflows/publish-npm.yml` via npm Trusted Publishing. Stable versions go to `latest` and prereleases to `next`. Follow the [release guide](docs/releases.md).
+- The private Google registry is `https://europe-west1-npm.pkg.dev/baiq-459807/npm-private/`, with scope `@baiq`. The dedicated `llmclient-main-publish` trigger runs `cloudbuild.yaml` on pushes to `main`. It installs dependencies, gets a temporary token, validates SemVer and the lockfile against all registry versions, checks types/build/imports, and repeats the gate before publishing. Duplicates, older versions and registry failures are errors.
+- Keep the Cloud Build service account `llmclient-publisher@baiq-459807.iam.gserviceaccount.com` limited to writing to `npm-private` and project logs. The dedicated GitHub connection is `llmclient`, using the existing `baiq-bq` installation and Secret Manager. Do not edit the shared `baiq` connection, modify unrelated triggers, or grant publishing access to PR jobs. Never store secrets in Git or the tarball. Use explicit gcloud project and region settings.
+- Do not publish manually if automation will publish the same commit. The manual `publish:private` command is reserved for explicitly requested operations, runs local checks and uses temporary gcloud credentials. Cloud Build does not run tests or gcloud from the Node container. Its trigger processes the commit from the push event, and a single push may contain multiple commits.

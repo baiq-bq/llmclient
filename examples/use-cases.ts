@@ -7,8 +7,8 @@ import { googleAdapter } from '../src/providers/google.js';
 import { deepseekAdapter } from '../src/providers/deepseek.js';
 import { kimiAdapter } from '../src/providers/kimi.js';
 export async function examples(keys: { openai: string; google: string }) {
-  const client = createLlmClient({ providers: [openaiAdapter({ apiKey: keys.openai }), googleAdapter({ apiKey: keys.google })], defaults: { model: LanguageModel.GPT61Sol } });
-  const messages = [{ role: 'user' as const, content: 'Resume el archivo.' }];
+  const client = createLlmClient({ providers: [openaiAdapter({ apiKey: keys.openai }), googleAdapter({ apiKey: keys.google })], defaults: { model: LanguageModel.GPT62Sol } });
+  const messages = [{ role: 'user' as const, content: 'Summarize the file.' }];
   const pdf = await client.generate({ messages, model: LanguageModel.Gemini38Flash, files: [{ bytes: await readFile('report.pdf'), mediaType: 'application/pdf', filename: 'report.pdf' }] });
   const docx = await client.generate({ messages, files: [{ bytes: await readFile('contract.docx'), mediaType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'contract.docx' }] });
   const object = await client.generateObject({ messages }, { schema: z.object({ title: z.string() }) });
@@ -27,7 +27,7 @@ export async function localExample() {
 
 export async function deepseekExample(apiKey: string) {
   const client = createLlmClient({ providers: [deepseekAdapter({ apiKey })] });
-  const messages = [{ role: 'user' as const, content: 'Clasifica este libro.' }];
+  const messages = [{ role: 'user' as const, content: 'Classify this book.' }];
   const result = await client.generateObject({ model: LanguageModel.DeepSeekFlash, messages, reasoning: { effort: 'high' } }, { schema: z.object({ title: z.string() }) });
   const stream = client.stream({ model: LanguageModel.DeepSeekV4Pro, messages });
   for await (const event of stream.events) if (event.type === 'text-delta') process.stdout.write(event.text);
@@ -36,9 +36,37 @@ export async function deepseekExample(apiKey: string) {
 
 export async function kimiExample(apiKey: string) {
   const client = createLlmClient({ providers: [kimiAdapter({ apiKey })] });
-  const messages = [{ role: 'user' as const, content: 'Clasifica este libro.' }];
+  const messages = [{ role: 'user' as const, content: 'Classify this book.' }];
   const result = await client.generateObject({ model: LanguageModel.KimiK31Pro, messages, reasoning: { effort: 'high' } }, { schema: z.object({ title: z.string() }) });
   const stream = client.stream({ model: LanguageModel.KimiK31ProHighspeed, messages, reasoning: { effort: 'low' } });
   for await (const event of stream.events) if (event.type === 'text-delta') process.stdout.write(event.text);
   return { result, final: await stream.result };
+}
+
+export async function structuredOutputExample(apiKey: string, signal?: AbortSignal) {
+  const client = createLlmClient({
+    providers: [openaiAdapter({ apiKey })],
+    defaults: { model: LanguageModel.GPT62Sol, timeoutMs: 30_000 },
+    retries: {
+      maxRetries: 2,
+      baseDelayMs: 250,
+      maxDelayMs: 3_000,
+      repairFromAttempt: 2,
+      maxRepairCharacters: 8_000,
+    },
+  });
+  const schema = z.object({
+    title: z.string().min(1),
+    sentiment: z.enum(['positive', 'neutral', 'negative']),
+    tags: z.array(z.string()),
+    followUp: z.string().nullable(),
+  });
+  const output = { schema, name: 'review_classification', description: 'Classify a user review.' };
+  const result = await client.generateObject({
+    messages: [{ role: 'user', content: 'Classify: Delivery was fast.' }],
+    timeoutMs: 15_000,
+    signal,
+  }, output);
+  const review: z.infer<typeof schema> = result.object;
+  return { review, cost: result.cost };
 }

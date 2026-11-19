@@ -11,16 +11,8 @@ Un borrador o un tag por sí solo no dispara el flujo de npm. GitHub Actions val
 
 En [Settings del paquete](https://www.npmjs.com/package/@baiq-bq/llmclient?activeTab=admin), el Trusted Publisher de GitHub Actions debe apuntar a la organización `baiq-bq`, repositorio `llmclient`, archivo `publish-npm.yml` y tener habilitado **Allow npm publish**. El flujo usa runners de GitHub y no necesita un token npm en secretos. Las configuraciones nuevas se deben validar con una publicación correcta en dos días. [Documentación de npm](https://docs.npmjs.com/trusted-publishers/).
 
-## Distribución desde Google Artifact Registry
+## Distribución privada interna
 
-El proyecto sigue generando el paquete `@baiq/llmclient` para sus registros de Google. El trigger `llmclient-main-publish` de Cloud Build publica al actualizar `main` en `npm-private` y `llmclient-public`. Las releases de GitHub publican el paquete de npmjs.org con el nombre `@baiq-bq/llmclient`.
+El trigger `llmclient-main-publish` de Cloud Build publica `@baiq/llmclient` en el repositorio interno `npm-private` al actualizar `main`. La única distribución pública es `@baiq-bq/llmclient` en npmjs.org.
 
-Para instalar desde el repositorio público de Google, configura el scope en el `.npmrc` de la aplicación:
-
-```ini
-@baiq:registry=https://europe-west1-npm.pkg.dev/baiq-459807/llmclient-public/
-```
-
-Después ejecuta `npm install @baiq/llmclient`. Para el registro privado, configura `npm-private` y usa una identidad autorizada. El scope puede apuntar a un solo registro por proyecto. [Autenticación de Artifact Registry](https://docs.cloud.google.com/artifact-registry/docs/nodejs/authentication).
-
-El trigger existente se consulta con `gcloud builds triggers describe llmclient-main-publish --region=europe-west1 --project=baiq-459807`. Las pruebas unitarias se ejecutan en local. El comando `npm run publish:private` se reserva para operaciones manuales de Google expresamente solicitadas.
+El trigger interno se consulta con `gcloud builds triggers describe llmclient-main-publish --region=europe-west1 --project=baiq-459807`. Las pruebas unitarias se ejecutan en local. El comando `npm run publish:private` se reserva para operaciones manuales de Google expresamente solicitadas.

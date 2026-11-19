@@ -1,6 +1,6 @@
 {
   "name": "@baiq/llmclient",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Configurable multi-provider LLM client with usage accounting, pricing overrides, tools and streaming",
   "license": "UNLICENSED",
   "type": "module",

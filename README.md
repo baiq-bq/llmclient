@@ -49,7 +49,7 @@ console.log(respuesta.text, respuesta.cost);
 
 Para los demás adaptadores instala `@ai-sdk/anthropic`, `@ai-sdk/google`, `@ai-sdk/xai`, `@ai-sdk/deepseek` o `@ai-sdk/moonshotai`, según el proveedor. Si vas a definir esquemas con `generateObject`, instala también `zod`. El paquete admite ESM y CommonJS e incluye declaraciones TypeScript.
 
-Si ya instalas `@baiq/llmclient` desde Google Artifact Registry, puedes seguir usando ese nombre. Sustituye `@baiq-bq/llmclient` por `@baiq/llmclient` en los imports.
+Si usabas una distribución anterior, instala `@baiq-bq/llmclient` desde npm y actualiza el nombre en tus imports.
 
 ## Crear un cliente y elegir modelos sin errores de escritura
 

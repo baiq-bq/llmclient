@@ -53,7 +53,9 @@ describe('Alibaba Qwen adapter', () => {
     expect(result.cost.status).toBe('unknown');
   });
 
-  it('preserves reasoning and the call ID when a tool result is sent back', async () => {
+  it.each([
+    model, LanguageModel.Qwen38Max, LanguageModel.Qwen38Max0902, LanguageModel.Qwen38Max20260902,
+  ])('preserves reasoning and the call ID after a tool on %s', async model => {
     const execute = vi.fn(async () => 9);
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(Response.json({ ...completion(), choices: [{
@@ -69,10 +71,41 @@ describe('Alibaba Qwen adapter', () => {
     expect(execute).toHaveBeenCalledOnce();
     expect(result).toMatchObject({ text: 'Price: 9', attemptCount: 2, usage: { inputTokens: 200 } });
     const followup = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+    expect(followup).toMatchObject({ model: model.slice('qwen:'.length), preserve_thinking: true });
     expect(followup.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ role: 'assistant', reasoning_content: 'Synthetic reasoning' }),
       expect.objectContaining({ role: 'tool', tool_call_id: 'qwen-tool-1' }),
     ]));
+  });
+
+  it.each([
+    [LanguageModel.Qwen4Max, 'medium', 4_096, 8_192],
+    [LanguageModel.Qwen4Max, 'high', 16_384, 20_480],
+    [LanguageModel.Qwen38Max, 'high', 16_384, 4_096],
+    [LanguageModel.Qwen38Flash, 'medium', 4_096, 4_096],
+  ] as const)('maps %s %s with the appropriate output limit', async (model, effort, thinkingBudget, maxTokens) => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (_, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({ thinking_budget: thinkingBudget, max_tokens: maxTokens });
+      return Response.json(completion());
+    });
+    await client(fetch).generate({ model, messages, reasoning: { effort } });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it('allows the verified combined maximum and respects explicitly configured caps', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (_, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({ thinking_budget: 262_143, max_tokens: 262_144 });
+      return Response.json(completion());
+    });
+    const configured = createLlmClient({ providers: [qwenAdapter({ apiKey: 'test' })], fetch, defaults: { maxOutputTokens: 4096 } });
+    await expect(configured.generate({ model, messages, reasoning: { effort: 'medium' } })).rejects.toMatchObject({
+      details: { reasons: ['reasoning_output_limit_exceeded'] },
+    });
+    await expect(configured.generate({ model, messages, maxOutputTokens: 262_144, reasoning: { effort: 'none' } })).rejects.toMatchObject({
+      details: { reasons: ['output_limit_exceeded'] },
+    });
+    await configured.generate({ model, messages, maxOutputTokens: 262_144, reasoning: { effort: 'high', budgetTokens: 262_143 } });
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it('uses non-thinking JSON Object mode where required and validates the result with Zod', async () => {

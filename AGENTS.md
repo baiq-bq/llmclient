@@ -4,7 +4,7 @@ These instructions apply to the entire repository. When preparing or reviewing a
 
 ## Architecture and behavior
 
-- Maintain Node.js 24+, ESM and CommonJS entry points, and declarations for both. The supported providers are OpenAI, Anthropic, Google, xAI, DeepSeek and Kimi. Keep each SDK an optional peer dependency and let callers choose which adapters to install.
+- Maintain Node.js 24+, ESM and CommonJS entry points, and declarations for both. The generation providers are OpenAI, Anthropic, Google, xAI, DeepSeek, Kimi and Qwen. The text embedding providers are OpenAI, Google, Voyage AI and DeepInfra. Keep each SDK an optional peer dependency and let callers choose which adapters to install.
 - `src/client.ts` orchestrates requests, `types.ts` defines contracts, `models.ts` and `catalog.ts` define the catalog, `pricing.ts` and `accounting.ts` handle costs, `execution.ts` handles deadlines and retries, `images.ts` handles image generation, and `providers/` contains the optional adapters.
 - Keep image and text model types separate. Infer literal IDs for registered external models without accepting arbitrary misspellings. Accept explicit configuration and keep the package independent of Editavia and environment variables.
 - Validate operations, reasoning, tools, MIME type and file limits before I/O. Return stable `LlmError` codes and structured alternatives with provider configuration status. Send files directly, without conversion, extraction or silent model substitution.

@@ -1,10 +1,13 @@
 // Compile-only examples. Credentials and paid calls are supplied by the consuming app.
 import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { createLlmClient, ImageModel, LanguageModel, LlmError, tool } from '../src/index.js';
+import { createLlmClient, EmbeddingModel, ImageModel, LanguageModel, LlmError, tool } from '../src/index.js';
 import { openaiAdapter } from '../src/providers/openai.js';
 import { googleAdapter } from '../src/providers/google.js';
 import { deepseekAdapter } from '../src/providers/deepseek.js';
+import { qwenAdapter } from '../src/providers/qwen.js';
+import { voyageAdapter } from '../src/providers/voyage.js';
+import { deepinfraAdapter } from '../src/providers/deepinfra.js';
 import { kimiAdapter } from '../src/providers/kimi.js';
 export async function examples(keys: { openai: string; google: string }) {
   const client = createLlmClient({ providers: [openaiAdapter({ apiKey: keys.openai }), googleAdapter({ apiKey: keys.google })], defaults: { model: LanguageModel.GPT62Sol } });
@@ -69,4 +72,41 @@ export async function structuredOutputExample(apiKey: string, signal?: AbortSign
   }, output);
   const review: z.infer<typeof schema> = result.object;
   return { review, cost: result.cost };
+}
+
+export async function embeddingExample(keys: { voyage: string; deepinfra: string }, signal?: AbortSignal) {
+  const client = createLlmClient({ providers: [
+    voyageAdapter({ apiKey: keys.voyage }),
+    deepinfraAdapter({ apiKey: keys.deepinfra }),
+  ] });
+  const documents = await client.embedMany({
+    model: EmbeddingModel.Voyage4Lite,
+    values: ['A sunny library', 'A quiet reading room'],
+    inputType: 'document',
+    dimensions: 1024,
+    signal,
+  });
+  const query = await client.embed({
+    model: EmbeddingModel.Voyage4,
+    value: 'Where can I read quietly?',
+    inputType: 'query',
+    dimensions: documents.dimensions,
+    signal,
+  });
+  const independent = await client.embed({
+    model: EmbeddingModel.Qwen3Embedding8B,
+    value: 'Where can I read quietly?',
+    signal,
+  });
+  return { documents, query, independent };
+}
+
+export async function qwenExample(apiKey: string, signal?: AbortSignal) {
+  const client = createLlmClient({ providers: [qwenAdapter({ apiKey })] });
+  return client.generate({
+    model: LanguageModel.Qwen4Max,
+    messages: [{ role: 'user', content: 'Explain how semantic search ranks passages.' }],
+    reasoning: { effort: 'low', budgetTokens: 1024 },
+    signal,
+  });
 }

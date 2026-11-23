@@ -5,8 +5,9 @@ import { anthropicAdapter } from '../src/providers/anthropic.js';
 import { googleAdapter } from '../src/providers/google.js';
 import { xaiAdapter } from '../src/providers/xai.js';
 import { deepseekAdapter } from '../src/providers/deepseek.js';
+import { qwenAdapter } from '../src/providers/qwen.js';
 import { kimiAdapter } from '../src/providers/kimi.js';
-const adapters = [openaiAdapter({ apiKey: 'synthetic' }), anthropicAdapter({ apiKey: 'synthetic' }), googleAdapter({ apiKey: 'synthetic' }), xaiAdapter({ apiKey: 'synthetic' }), deepseekAdapter({ apiKey: 'synthetic' }), kimiAdapter({ apiKey: 'synthetic' })];
+const adapters = [openaiAdapter({ apiKey: 'synthetic' }), anthropicAdapter({ apiKey: 'synthetic' }), googleAdapter({ apiKey: 'synthetic' }), xaiAdapter({ apiKey: 'synthetic' }), deepseekAdapter({ apiKey: 'synthetic' }), kimiAdapter({ apiKey: 'synthetic' }), qwenAdapter({ apiKey: 'synthetic' })];
 const messages = [{ role: 'user' as const, content: 'test' }];
 describe('verified catalog transport compatibility', () => {
   it('keeps exported identifiers and adapter catalogs synchronized', () => {
@@ -15,7 +16,7 @@ describe('verified catalog transport compatibility', () => {
     for (const adapter of adapters) {
       expect(Object.keys(adapter.models!).map(id => `${adapter.id}:${id}`).sort()).toEqual(Object.keys(modelCatalog).filter(id => id.startsWith(`${adapter.id}:`)).sort());
     }
-    for (const model of Object.keys(modelCatalog)) expect(defaultPricing[model as keyof typeof defaultPricing]).toHaveProperty('version', '2026-11-19');
+    for (const model of Object.keys(modelCatalog)) expect(defaultPricing[model as keyof typeof defaultPricing]).toHaveProperty('version', model.startsWith('qwen:') ? '2026-11-23' : '2026-11-19');
   });
   it('uses current rates for the latest Anthropic and Gemini models', () => {
     expect(defaultPricing[LanguageModel.ClaudeFable52]!.rates).toEqual({ input: 8, output: 40, cachedInput: 0.2, cacheWrite: 10 });
@@ -35,7 +36,7 @@ describe('verified catalog transport compatibility', () => {
     if (model.startsWith('google:')) expect(url!).toContain(apiId);
     else expect(body.model).toBe(apiId);
   });
-  const reasoningCases = Object.entries(modelCatalog).flatMap(([model, def]) => (def.capabilities.reasoning?.efforts ?? []).map(effort => ({ model: model as BuiltinLanguageModel, effort })));
+  const reasoningCases = Object.entries(modelCatalog).filter(([model]) => !model.startsWith('qwen:')).flatMap(([model, def]) => (def.capabilities.reasoning?.efforts ?? []).map(effort => ({ model: model as BuiltinLanguageModel, effort })));
   it.each(reasoningCases)('maps $model effort $effort through its SDK', async ({ model, effort }) => {
     let body: any;
     const send = vi.fn<typeof fetch>(async (_, init) => { body = JSON.parse(String(init?.body)); return Response.json({}, { status: 400 }); });

@@ -2,7 +2,7 @@
 
 <a href="https://baiq.eu"><img src="https://baiq.eu/assets/baiq-logotipo-positivo-rgb.svg" alt="baiq" width="120"></a>
 
-A TypeScript client for Node.js 24+ built on the AI SDK. It supports text, validated objects, streaming, tools, image generation and editing, and per-attempt usage and cost. It works with OpenAI, Anthropic, Google Gemini, xAI, DeepSeek and Kimi, and includes an offline mock provider.
+A TypeScript client for Node.js 24+ built on the AI SDK. It supports text, validated objects, streaming, tools, image generation and editing, text embeddings, and per-attempt usage and cost. It works with OpenAI, Anthropic, Google Gemini, xAI, DeepSeek, Kimi and Qwen for generation and with OpenAI, Google Gemini, Voyage AI and DeepInfra for embeddings. It includes an offline mock provider.
 
 Developed by BQ. [bq.land](https://bq.land) · [baiq.eu](https://baiq.eu)
 
@@ -71,16 +71,37 @@ With Yarn Plug'n'Play, run `yarn unplug @baiq-bq/llmclient` and copy the skill f
 | Google | `providers/google` | `@ai-sdk/google` | Gemini 4 Hydrogen, Neon, Carbon and Argon |
 | xAI | `providers/xai` | `@ai-sdk/xai` | Grok 4.7, 4.6 and Build 0.1 |
 | DeepSeek | `providers/deepseek` | `@ai-sdk/deepseek` | DeepSeek Flash and V4 Pro |
+| Qwen (Alibaba Cloud Model Studio) | `providers/qwen` | `@ai-sdk/alibaba` | Qwen4 Max, Qwen3.8 Max and Flash, Qwen3.7 Plus |
 | Kimi (Moonshot AI) | `providers/kimi` | `@ai-sdk/moonshotai` | Kimi K3.1 Pro, Highspeed and K3 |
 
 Use the installed package's `LanguageModel` and `ImageModel` constants for exact IDs and TypeScript autocomplete. Use `client.listModels()` to inspect supported operations, reasoning levels, file constraints and which providers are configured. Catalog inclusion does not establish provider account access or regional availability. For example, Claude Mythos requires approval, and preview or older aliases can change upstream.
 
-Gemini 4 supports up to 65,536 output tokens through the synchronous adapter. Neon and Hydrogen's `xhigh` is unavailable through the installed Google SDK. DeepSeek Flash supports vision and V4 Pro is text-only in this adapter. Kimi K3 models always reason and expose `low`, `high` and `max`. GPT-6.1 Terra's `none` is unavailable through the installed SDK. The package targets text and images. Live audio, video, embeddings and specialized endpoints require other integrations.
+Gemini 4 supports up to 65,536 output tokens through the synchronous adapter. Neon and Hydrogen's `xhigh` is unavailable through the installed Google SDK. DeepSeek Flash supports vision and V4 Pro is text-only in this adapter. Kimi K3 models always reason and expose `low`, `high` and `max`. GPT-6.1 Terra's `none` is unavailable through the installed SDK. See [Text embeddings](#text-embeddings) for vector model selection and adapter setup.
 
 ### Provider-specific notes
 
 - **DeepSeek** uses native Chat Completions and preserves `reasoning_content` across conversation and tool steps. The supported efforts are `none`, `low`, `high` and `max`. The provider defaults to `high` when omitted. The output limit is 393,216 tokens including reasoning. Flash accepts common image formats including GIF, and the text adapter does not expose PDF or temperature. [DeepSeek model details](https://api-docs.deepseek.com/quick_start/pricing/)
 - **Kimi** uses native Chat Completions, preserves reasoning across turns and sends strict JSON Schema for objects. The adapter caps output at 32,768 tokens and accepts PNG, JPEG, WebP and GIF references up to the catalog limits. PDF, DOCX and image generation are outside this adapter's scope. With `providerOptions.moonshotai.promptCacheOptions: { mode: 'implicit', ttl: '1h' }`, supply the appropriate hourly cache-write rate in `pricing`. Check the provider's retention behavior when refreshing existing cache entries. [Kimi cache documentation](https://platform.kimi.ai/docs/guide/context-caching)
+
+### Qwen on Alibaba Cloud Model Studio
+
+Install `@ai-sdk/alibaba` and pass the Model Studio API key to `qwenAdapter`. The default endpoint serves Singapore. For another region or a Token Plan subscription, pass that workspace's OpenAI-compatible `baseURL`.
+
+```ts
+import { createLlmClient, LanguageModel } from '@baiq-bq/llmclient';
+import { qwenAdapter } from '@baiq-bq/llmclient/providers/qwen';
+
+const client = createLlmClient({ providers: [qwenAdapter({ apiKey })] });
+const answer = await client.generate({
+  model: LanguageModel.Qwen4Max,
+  messages: [{ role: 'user', content: 'Compare these two proposals.' }],
+  reasoning: { effort: 'low', budgetTokens: 1024 },
+});
+```
+
+The catalog includes Qwen4 Max and its Token Plan preview aliases, the Qwen3.8, 3.7, 3.6 and 3.5 generation families and their still-documented snapshots, and selected older Max, Plus, Flash, VL and Coder models. Aliases and dated snapshots are passed to Alibaba exactly as requested. Qwen4 Max Preview requires a Token Plan key and the dedicated base URL. Its preview ends November 25, 2026 at 24:00 UTC+8. Alibaba has scheduled selected Qwen3.5 Plus variants and Qwen3.5 397B for retirement on January 19, 2027. [Models](https://www.alibabacloud.com/help/en/model-studio/text-generation-model) · [Snapshots](https://www.alibabacloud.com/help/en/model-studio/newly-released-models) · [Token Plan](https://www.alibabacloud.com/help/en/model-studio/token-plan-team-overview) · [Retirement notice](https://www.alibabacloud.com/notice/detail?id=2217)
+
+Use `client.listModels()` for supported modes and limits. The adapter accepts text and validates inline JPEG, PNG and WebP on vision models. On models that restrict structured output to non-thinking mode, `generateObject` and structured streaming disable thinking when no reasoning is requested. Some open-weight variants require streaming for thinking. The installed SDK uses JSON Object mode with final Zod validation for Qwen4 Max. [Chat compatibility](https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope) · [Thinking](https://www.alibabacloud.com/help/en/model-studio/deep-thinking) · [Structured output](https://www.alibabacloud.com/help/en/model-studio/qwen-structured-output)
 
 ## Structured output
 
@@ -224,7 +245,7 @@ For image editing, pass references as `files` with an image MIME type. Image mod
 
 Results expose `usage`, `usageComplete`, `cost` and `entries`. Cache reads and reported writes are charged separately from uncached input. Reasoning included in output is not charged twice. The estimate can be `known`, `partial` or `unknown`. `estimatedUsd: null` means there is no known subtotal.
 
-Override prices per client. Rates merge by model and individual field, and zero is valid. `longContext: null` removes a built-in long-context tier. Token prices use USD per million tokens, and flat image rates use USD per image.
+Override prices per client. Rates merge by model and individual field, and zero is valid. `longContext: null` removes a built-in long-context tier. For models with multiple context boundaries, use `contextTiers` with ascending `minimumInputTokens` values. A custom list replaces the set of thresholds and merges rate fields at matching thresholds. Set it to `null` to remove those tiers. Each tier inherits unspecified rates from the standard tier. Token prices use USD per million tokens, and flat image rates use USD per image.
 
 ```ts
 const pricedClient = createLlmClient({
@@ -281,11 +302,13 @@ Standard on-demand rates in USD per million tokens. Snapshot reviewed on **2026-
 | DeepSeek Flash and V4 Pro | Variable | Variable | Variable | — |
 | Mock | 0 | 0 | 0 | 0 |
 
-Long-context tiers apply per request for applicable OpenAI, Anthropic Haiku 5.5, Gemini 3.1 Pro Preview and xAI models. Inspect `defaultPricing` for exact thresholds and rates. Anthropic and Kimi cache writes use the five-minute rate in the table. OpenAI uses the 30-minute rate. Override the write rate if you use a different retention period. Gemini 4 Argon and Carbon have introductory rates through November 30, 2026, then change to $4 input, $20 output and $0.20 cached input. For Gemini 3.8, 3.7 and 3.6 Flash, check rates again for usage after December 31, 2026.
+Long-context tiers apply per request for applicable OpenAI, Anthropic Haiku 5.5, Gemini 3.1 Pro Preview and xAI models. Inspect `defaultPricing` for exact thresholds and rates. Anthropic and Kimi cache writes use the five-minute rate in the table. OpenAI uses the 30-minute rate. Override the write rate if you use a different retention period. Gemini 4 Argon and Carbon have introductory rates through November 30, 2026, then change to $4 input, $20 output and $0.20 cached input. Google documents standard Gemini 3.8 and 3.6 Flash rates of $1.50 input, $7.50 output and $0.15 cached input from January 1, 2027. Apply a pricing override when using those rates with this snapshot.
 
 DeepSeek requires an explicit price override. Flash costs $0.15 / $0.60 / $0.003 per million input / output / cache-read tokens off-peak and $0.30 / $1.20 / $0.006 at peak. V4 Pro costs $0.66 / $1.98 / $0.022 off-peak and $1.32 / $3.96 / $0.044 at peak. Peak hours are 01:00–04:00 and 06:00–10:00 UTC on weekdays, excluding Chinese public holidays.
 
 Official pricing: [OpenAI](https://developers.openai.com/api/docs/pricing), [Anthropic](https://platform.claude.com/docs/en/about-claude/pricing), [Google](https://aistudio.google.com/docs/pricing), [xAI](https://docs.x.ai/developers/pricing), [DeepSeek](https://api-docs.deepseek.com/quick_start/pricing/) and [Kimi](https://platform.kimi.ai/docs/pricing/chat).
+
+**Qwen on Alibaba Cloud Model Studio.** The November 23, 2026 snapshot uses standard Singapore pay-as-you-go rates where verified. Qwen4 Max is $1.50 input and $4.50 output, Qwen3.8 Max is $2 and $6, and Qwen3.8 Flash is $0.15 and $0.47 per million tokens. Qwen3.7 Plus starts at $0.40 input and $1.60 output. Flash, Plus, VL and Coder tiers vary by model and input count. Cache writes, console-only cache discounts, modality-dependent rates and Token Plan credits can require pricing overrides. The known subtotal is retained when a rate is unavailable. [Model Studio prices](https://www.alibabacloud.com/help/en/model-studio/model-pricing) · [Cache billing](https://www.alibabacloud.com/help/en/model-studio/context-cache)
 
 ## Image pricing
 
@@ -297,6 +320,59 @@ Official pricing: [OpenAI](https://developers.openai.com/api/docs/pricing), [Ant
 | Mock | $0 |
 
 For xAI Image 2.0, changing quality or resolution can make the generated image cost unknown while retaining the known input image subtotal. The retired `grok-imagine-image-quality` alias is retained for compatibility. [xAI migration notice](https://docs.x.ai/developers/migration/imagine-image-quality-nov-2)
+
+## Text embeddings
+
+An embedding is a vector representing the meaning of an input. Use it for semantic search, retrieval for RAG, clustering or classification. For search, split your corpus into passages, embed them and store the vectors with the source text and model metadata. Embed the query into the same space and use your vector store to find the nearest passages. Call `embed` for one text and `embedMany` for a list. Both take an explicit embedding model and return its ID, vector dimensions, usage and estimated cost. `embedMany` returns one vector per input in the same order. The client splits larger lists into provider calls, retries failed batches under one deadline, and records usage from successful batches if a later batch fails. Pass an `AbortSignal` to cancel.
+
+Use the existing OpenAI and Google adapters or import `voyageAdapter` and `deepinfraAdapter` from their respective provider subpaths. Voyage AI and DeepInfra use HTTP directly with an explicit API key. Use `EmbeddingModel`, `embeddingModelCatalog` and `client.listEmbeddingModels()` for IDs, capabilities, and configuration status.
+
+```ts
+import { createLlmClient, EmbeddingModel } from '@baiq-bq/llmclient';
+import { voyageAdapter } from '@baiq-bq/llmclient/providers/voyage';
+
+const client = createLlmClient({ providers: [voyageAdapter({ apiKey })] });
+const documents = await client.embedMany({
+  model: EmbeddingModel.Voyage4Lite,
+  values: ['The library closes at six.', 'The museum closes at eight.'],
+  inputType: 'document',
+  dimensions: 1024,
+});
+const query = await client.embed({
+  model: EmbeddingModel.Voyage4,
+  value: 'When does the library close?',
+  inputType: 'query',
+  dimensions: documents.dimensions,
+});
+```
+
+Keep model and dimension metadata with your index. Rebuild it when changing to an incompatible embedding space, even if dimensions match. Voyage documents a shared space for `voyage-4-lite`, `voyage-4` and `voyage-4-large` when using the same dimensions. Check `dimensions` and `inputType` capabilities before passing these options. Use task instructions in the text for Gemini Embedding 2. [Voyage model guide](https://docs.voyageai.com/docs/embeddings) · [Gemini embeddings guide](https://ai.google.dev/gemini-api/docs/embeddings)
+
+Start with `EmbeddingModel.TextEmbedding3Small` on OpenAI or `EmbeddingModel.GeminiEmbedding2` on Google when you already configure those providers. Voyage's 4 family provides general multilingual retrieval, with dedicated code, legal and finance alternatives. DeepInfra hosts three Qwen3 Embedding sizes as well as BGE, E5, NVIDIA Nemotron and Sentence Transformers models. Select a model with `EmbeddingModel` or its exact catalog ID.
+
+```ts
+import { createLlmClient, EmbeddingModel } from '@baiq-bq/llmclient';
+import { deepinfraAdapter } from '@baiq-bq/llmclient/providers/deepinfra';
+
+const client = createLlmClient({ providers: [deepinfraAdapter({ apiKey })] });
+const { embedding, model, dimensions } = await client.embed({
+  model: EmbeddingModel.Qwen3Embedding8B,
+  value: 'Where can I find the library opening hours?',
+});
+```
+
+This example uses a DeepInfra API key. The Qwen chat adapter uses a separate Alibaba Cloud Model Studio key.
+
+The catalog includes the hosted Voyage text, contextualized and multimodal embedding models and 30 active public DeepInfra embedding models as reviewed on November 23, 2026. Both methods accept text and return dense vectors. Each input to a Voyage contextualized model is sent as a single independent text. Each provider enforces its tokenizer limits. Some DeepInfra endpoints truncate long inputs, so pre-chunk text to fit the model limit. [Voyage lifecycle](https://docs.voyageai.com/docs/choose-a-model) · [DeepInfra catalog](https://deepinfra.com/models/embeddings) · [DeepInfra catalog, page 2](https://deepinfra.com/models/embeddings/2)
+
+### Embedding pricing
+
+Standard paid text rates in USD per million input tokens, reviewed November 23, 2026. Per-model rates and sources are available in `defaultPricing`. Estimates use reported tokens. If a response omits usage, cost is unknown for that call. Free allowances, credits, priority tiers and asynchronous Batch API discounts are account or endpoint specific. Use a client pricing override when those rates apply.
+
+- **OpenAI** `text-embedding-3-small` costs $0.02. `text-embedding-3-large` costs $0.13. [Small](https://developers.openai.com/api/docs/models/text-embedding-3-small) · [Large](https://developers.openai.com/api/docs/models/text-embedding-3-large)
+- **Google** `gemini-embedding-2` costs $0.20 for text. `gemini-embedding-001` costs $0.15 and is scheduled to retire on May 14, 2028. [Pricing](https://ai.google.dev/gemini-api/docs/pricing#gemini-embedding-2) · [Deprecations](https://ai.google.dev/gemini-api/docs/deprecations#embedding-models)
+- **Voyage AI** `voyage-4-lite`, `voyage-4` and `voyage-4-large` cost $0.02, $0.06 and $0.12 respectively beyond their 200 million free standard API tokens. [Voyage pricing](https://docs.voyageai.com/docs/pricing)
+- **DeepInfra** `Qwen/Qwen3-Embedding-8B` and `Qwen/Qwen3-Embedding-0.6B` cost $0.01 each. `Qwen/Qwen3-Embedding-4B` costs $0.02. [DeepInfra pricing and model catalog](https://deepinfra.com/models/embeddings)
 
 ## Extend or test the client
 
@@ -327,9 +403,9 @@ const result = await extended.generate({
 });
 ```
 
-`defineProvider` registers an external AI SDK V4 model or an adapter with its own image models, reasoning options and accounting. Literal model IDs receive TypeScript autocomplete. Verify capability declarations before accepting files or enabling tools. `options.models` and `options.imageModels` can add models to a configured adapter.
+`defineProvider` registers an external AI SDK V4 model or an adapter with its own image models, reasoning options and accounting. Literal model IDs receive TypeScript autocomplete. Verify capability declarations before accepting files or enabling tools. `options.models`, `options.imageModels` and `options.embeddingModels` can register additional models on a configured adapter. An external embedding-only adapter implements `embedText` and can declare its own `embeddingModels`.
 
-Use `mock.text`, `mock.object`, or `mock.generateObject(schema)` for offline tests. Mock output is validated against the same Zod schema and incurs zero cost. Mock image generation returns a fixed 1×1 PNG. The mock does not execute tools, so test real provider contracts with a simulated transport. [Compile-only examples](https://github.com/baiq-bq/llmclient/blob/main/examples/use-cases.ts)
+Use `mock.text`, `mock.object`, or `mock.generateObject(schema)` for offline tests. Mock output is validated against the same Zod schema and incurs zero cost. Mock image generation returns a fixed 1×1 PNG. `EmbeddingModel.Mock` produces deterministic vectors at zero cost for offline tests. The mock does not execute tools, so test real provider contracts with a simulated transport. [Compile-only examples](https://github.com/baiq-bq/llmclient/blob/main/examples/use-cases.ts)
 
 ## Development and license
 

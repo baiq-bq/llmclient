@@ -1,4 +1,6 @@
-import type { ModelCapabilities, ModelDefinition, ModelId, PricingEntry, ImageModelDefinition } from './types.js';
+import { qwenModelDefinitions, qwenPriceDefinitions } from './qwen-catalog.js';
+import { EmbeddingModel, type BuiltinEmbeddingModel } from './models.js';
+import type { EmbeddingModelDefinition, ModelCapabilities, ModelDefinition, ModelId, PricingEntry, ImageModelDefinition } from './types.js';
 
 const imageTypes = ['image/png', 'image/jpeg', 'image/webp'];
 const documents = ['application/pdf'];
@@ -74,7 +76,7 @@ for (const name of ['kimi-k3.1-pro', 'kimi-k3.1-pro-highspeed', 'kimi-k3']) lang
   },
   source: 'https://platform.kimi.ai/docs/models',
 };
-export const modelCatalog: Readonly<Record<ModelId, ModelDefinition>> = deepFreeze(languageDefinitions);
+export const modelCatalog: Readonly<Record<ModelId, ModelDefinition>> = deepFreeze({ ...languageDefinitions, ...qwenModelDefinitions });
 export const pricingVersion = '2026-11-19';
 const openaiSource = 'https://developers.openai.com/api/docs/pricing';
 const anthropicSource = 'https://platform.claude.com/docs/en/about-claude/pricing';
@@ -117,7 +119,6 @@ priceDefinitions['xai:grok-imagine-image-quality'] = { rates: { image: 0.04, inp
 for (const [name, input, output, cached, write] of [
   ['kimi-k3.1-pro', 2, 10, 0.2, 2], ['kimi-k3.1-pro-highspeed', 4, 20, 0.2, 4], ['kimi-k3', 3, 15, 0.3, 3],
 ] as const) priceDefinitions[`kimi:${name}`] = entry('https://platform.kimi.ai/docs/pricing/chat', input, output, cached, write);
-export const defaultPricing: Readonly<Record<ModelId, PricingEntry>> = deepFreeze(priceDefinitions);
 function deepFreeze<T extends object>(obj: T): T {
   for (const child of Object.values(obj)) if (child && typeof child === 'object') deepFreeze(child);
   return Object.freeze(obj);
@@ -138,3 +139,90 @@ imageDefinitions['google:gemini-nano-banana-2.1'] = {
 for (const name of ['grok-imagine-image', 'grok-imagine-image-quality']) imageDefinitions[`xai:${name}`] = { ...imageDefinitions['xai:grok-imagine-image-2.0']!, source: xaiSource };
 for (const name of ['gemini-3.1-flash-lite-image', 'gemini-3-pro-image']) imageDefinitions[`google:${name}`]!.aspectRatios = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
 export const imageModelCatalog: Readonly<Record<ModelId, ImageModelDefinition>> = deepFreeze(imageDefinitions);
+
+const embeddingPricingVersion = '2026-11-23';
+const voyageTextSource = 'https://docs.voyageai.com/docs/embeddings';
+const voyageContextSource = 'https://docs.voyageai.com/docs/contextualized-chunk-embeddings';
+const voyageMultimodalSource = 'https://docs.voyageai.com/docs/multimodal-embeddings';
+const voyageDimensions = [256, 512, 1024, 2048] as const;
+
+function embedding(maxInputTokens: number, maxBatchSize: number, defaultDimensions: number | undefined, input: number, source: string, options: Partial<EmbeddingModelDefinition> = {}, pricingSource = source) {
+  const definition: EmbeddingModelDefinition = { maxInputTokens, maxBatchSize, defaultDimensions, source, status: 'stable', ...options };
+  const pricing: PricingEntry = { rates: { input }, source: pricingSource, version: embeddingPricingVersion };
+  return { definition, pricing };
+}
+function voyageEmbedding(maxInputTokens: number, dimensions: number, input: number, source: string, options?: Partial<EmbeddingModelDefinition>) {
+  return embedding(maxInputTokens, 100, dimensions, input, source, { inputType: true, maxBatchBytes: 100_000, ...options }, 'https://docs.voyageai.com/docs/pricing');
+}
+function deepInfraEmbedding(id: string, maxInputTokens: number, dimensions: number | undefined, input: number, options?: Partial<EmbeddingModelDefinition>) {
+  return embedding(maxInputTokens, 32, dimensions, input, `https://deepinfra.com/${id}/api`, { maxBatchBytes: 100_000, ...options });
+}
+
+const embeddingDefinitions = {
+  [EmbeddingModel.TextEmbedding3Small]: embedding(8_192, 32, 1_536, 0.02, 'https://developers.openai.com/api/docs/models/text-embedding-3-small', { dimensions: { min: 1, max: 1536 }, maxBatchBytes: 300_000 }),
+  [EmbeddingModel.TextEmbedding3Large]: embedding(8_192, 32, 3_072, 0.13, 'https://developers.openai.com/api/docs/models/text-embedding-3-large', { dimensions: { min: 1, max: 3072 }, maxBatchBytes: 300_000 }),
+  [EmbeddingModel.GeminiEmbedding2]: embedding(8_192, 100, 3_072, 0.20, 'https://ai.google.dev/gemini-api/docs/embeddings', { dimensions: { min: 128, max: 3072 } }, 'https://ai.google.dev/gemini-api/docs/pricing#gemini-embedding-2'),
+  [EmbeddingModel.GeminiEmbedding001]: embedding(2_048, 100, 3_072, 0.15, 'https://ai.google.dev/gemini-api/docs/embeddings', { dimensions: { min: 128, max: 3072 }, inputType: true, status: 'legacy', retirementDate: '2028-05-14' }, 'https://ai.google.dev/gemini-api/docs/pricing#gemini-embedding'),
+  [EmbeddingModel.Voyage4Lite]: voyageEmbedding(32_000, 1_024, 0.02, voyageTextSource, { dimensions: voyageDimensions }),
+  [EmbeddingModel.Voyage4]: voyageEmbedding(32_000, 1_024, 0.06, voyageTextSource, { dimensions: voyageDimensions }),
+  [EmbeddingModel.Voyage4Large]: voyageEmbedding(32_000, 1_024, 0.12, voyageTextSource, { dimensions: voyageDimensions }),
+  [EmbeddingModel.VoyageCode4]: voyageEmbedding(32_000, 1_024, 0.12, voyageTextSource, { dimensions: voyageDimensions }),
+  [EmbeddingModel.VoyageContext4]: voyageEmbedding(32_000, 1_024, 0.12, voyageContextSource, { dimensions: voyageDimensions, maxBatchBytes: 30_000 }),
+  [EmbeddingModel.VoyageMultimodal35]: voyageEmbedding(32_000, 1_024, 0.12, voyageMultimodalSource, { dimensions: voyageDimensions }),
+  [EmbeddingModel.Voyage35Lite]: voyageEmbedding(32_000, 1_024, 0.02, voyageTextSource, { dimensions: voyageDimensions, status: 'legacy', retirementDate: '2027-12-01' }),
+  [EmbeddingModel.Voyage35]: voyageEmbedding(32_000, 1_024, 0.06, voyageTextSource, { dimensions: voyageDimensions, status: 'legacy', retirementDate: '2027-12-01' }),
+  [EmbeddingModel.Voyage3Large]: voyageEmbedding(32_000, 1_024, 0.18, voyageTextSource, { dimensions: voyageDimensions, status: 'legacy', retirementDate: '2027-12-01' }),
+  [EmbeddingModel.Voyage3]: voyageEmbedding(32_000, 1_024, 0.06, voyageTextSource, { status: 'legacy' }),
+  [EmbeddingModel.Voyage3Lite]: voyageEmbedding(32_000, 512, 0.02, voyageTextSource, { status: 'legacy' }),
+  [EmbeddingModel.VoyageCode3]: voyageEmbedding(32_000, 1_024, 0.18, voyageTextSource, { dimensions: voyageDimensions, status: 'legacy', retirementDate: '2028-02-13' }),
+  [EmbeddingModel.VoyageCode2]: voyageEmbedding(16_000, 1_536, 0.12, voyageTextSource, { status: 'legacy', retirementDate: '2027-12-01' }),
+  [EmbeddingModel.VoyageContext3]: voyageEmbedding(32_000, 1_024, 0.18, voyageContextSource, { dimensions: voyageDimensions, status: 'legacy', retirementDate: '2027-12-30' }),
+  [EmbeddingModel.VoyageMultimodal3]: voyageEmbedding(32_000, 1_024, 0.12, voyageMultimodalSource, { status: 'legacy', retirementDate: '2027-12-01' }),
+  [EmbeddingModel.VoyageFinance2]: voyageEmbedding(32_000, 1_024, 0.12, voyageTextSource, { status: 'legacy', retirementDate: '2027-12-01' }),
+  [EmbeddingModel.VoyageLaw2]: voyageEmbedding(16_000, 1_024, 0.12, voyageTextSource, { status: 'legacy', retirementDate: '2027-12-01' }),
+  [EmbeddingModel.VoyageMultilingual2]: voyageEmbedding(32_000, 1_024, 0.12, voyageTextSource, { status: 'legacy' }),
+  [EmbeddingModel.VoyageLarge2Instruct]: voyageEmbedding(16_000, 1_024, 0.12, voyageTextSource, { status: 'legacy' }),
+  [EmbeddingModel.VoyageLarge2]: voyageEmbedding(16_000, 1_536, 0.12, voyageTextSource, { status: 'legacy' }),
+  [EmbeddingModel.Voyage2]: voyageEmbedding(4_000, 1_024, 0.10, voyageTextSource, { status: 'legacy' }),
+  [EmbeddingModel.VoyageLite02Instruct]: voyageEmbedding(4_000, 1_024, 0.10, voyageTextSource, { status: 'deprecated' }),
+  [EmbeddingModel.Voyage02]: voyageEmbedding(4_000, 1_024, 0.10, voyageTextSource, { status: 'deprecated' }),
+  [EmbeddingModel.Voyage01]: voyageEmbedding(4_000, 1_024, 0.10, voyageTextSource, { status: 'deprecated' }),
+  [EmbeddingModel.VoyageLite01]: voyageEmbedding(4_000, 1_024, 0.10, voyageTextSource, { status: 'deprecated' }),
+  [EmbeddingModel.VoyageLite01Instruct]: voyageEmbedding(4_000, 1_024, 0.10, voyageTextSource, { status: 'deprecated' }),
+  [EmbeddingModel.BgeBaseEn15]: deepInfraEmbedding('BAAI/bge-base-en-v1.5', 512, 768, 0.005),
+  [EmbeddingModel.BgeEnIcl]: deepInfraEmbedding('BAAI/bge-en-icl', 8_192, 4_096, 0.010),
+  [EmbeddingModel.BgeLargeEn15]: deepInfraEmbedding('BAAI/bge-large-en-v1.5', 512, 1_024, 0.010),
+  [EmbeddingModel.BgeM3]: deepInfraEmbedding('BAAI/bge-m3', 8_192, 1_024, 0.010),
+  [EmbeddingModel.BgeM3Multi]: deepInfraEmbedding('BAAI/bge-m3-multi', 512, 1_024, 0.010),
+  [EmbeddingModel.BgeM3Multi8K]: deepInfraEmbedding('BAAI/bge-m3-multi-8k', 8_192, 1_024, 0.010),
+  [EmbeddingModel.EmbeddingGemma2]: deepInfraEmbedding('google/embeddinggemma-2', 8_192, 768, 0.020, { dimensions: [128, 256, 512, 768], inputType: true }),
+  [EmbeddingModel.E5BaseV2]: deepInfraEmbedding('intfloat/e5-base-v2', 512, undefined, 0.005),
+  [EmbeddingModel.E5LargeV2]: deepInfraEmbedding('intfloat/e5-large-v2', 512, 1_024, 0.010),
+  [EmbeddingModel.MultilingualE5Large]: deepInfraEmbedding('intfloat/multilingual-e5-large', 512, 1_024, 0.010),
+  [EmbeddingModel.MultilingualE5LargeInstruct]: deepInfraEmbedding('intfloat/multilingual-e5-large-instruct', 512, 1_024, 0.010),
+  [EmbeddingModel.LlamaNemotronEmbedVl1BV2]: deepInfraEmbedding('nvidia/llama-nemotron-embed-vl-1b-v2', 10_240, 2_048, 0.010),
+  [EmbeddingModel.Nemotron3Embed1BBf16]: deepInfraEmbedding('nvidia/Nemotron-3-Embed-1B-BF16', 32_768, 2_048, 0.015),
+  [EmbeddingModel.Nemotron3Embed1BNvfp4]: deepInfraEmbedding('nvidia/Nemotron-3-Embed-1B-NVFP4', 32_768, 2_048, 0.010),
+  [EmbeddingModel.Nemotron3Embed8B]: deepInfraEmbedding('nvidia/Nemotron-3-Embed-8B', 32_768, 4_096, 0.035),
+  [EmbeddingModel.Nemotron35Embed1BBf16]: deepInfraEmbedding('nvidia/Nemotron-3.5-Embed-1B-BF16', 32_768, undefined, 0.015, { inputType: true }),
+  [EmbeddingModel.Nemotron35Embed8BBf16]: deepInfraEmbedding('nvidia/Nemotron-3.5-Embed-8B-BF16', 32_768, undefined, 0.035, { inputType: true }),
+  [EmbeddingModel.Qwen3Embedding06B]: deepInfraEmbedding('Qwen/Qwen3-Embedding-0.6B', 32_768, 1_024, 0.010),
+  [EmbeddingModel.Qwen3Embedding4B]: deepInfraEmbedding('Qwen/Qwen3-Embedding-4B', 32_768, 2_560, 0.020),
+  [EmbeddingModel.Qwen3Embedding8B]: deepInfraEmbedding('Qwen/Qwen3-Embedding-8B', 32_768, 4_096, 0.010),
+  [EmbeddingModel.AllMiniLML12V2]: deepInfraEmbedding('sentence-transformers/all-MiniLM-L12-v2', 512, 384, 0.005),
+  [EmbeddingModel.AllMiniLML6V2]: deepInfraEmbedding('sentence-transformers/all-MiniLM-L6-v2', 512, 384, 0.005),
+  [EmbeddingModel.AllMpnetBaseV2]: deepInfraEmbedding('sentence-transformers/all-mpnet-base-v2', 512, 768, 0.005),
+  [EmbeddingModel.ClipViTB32]: deepInfraEmbedding('sentence-transformers/clip-ViT-B-32', 77, 512, 0.005),
+  [EmbeddingModel.ClipViTB32MultilingualV1]: deepInfraEmbedding('sentence-transformers/clip-ViT-B-32-multilingual-v1', 512, 512, 0.005),
+  [EmbeddingModel.MultiQaMpnetBaseDotV1]: deepInfraEmbedding('sentence-transformers/multi-qa-mpnet-base-dot-v1', 512, 768, 0.005),
+  [EmbeddingModel.ParaphraseMiniLML6V2]: deepInfraEmbedding('sentence-transformers/paraphrase-MiniLM-L6-v2', 512, 384, 0.005),
+  [EmbeddingModel.Text2VecBaseChinese]: deepInfraEmbedding('shibing624/text2vec-base-chinese', 512, 768, 0.005),
+  [EmbeddingModel.GteBase]: deepInfraEmbedding('thenlper/gte-base', 512, 768, 0.005),
+  [EmbeddingModel.GteLarge]: deepInfraEmbedding('thenlper/gte-large', 512, 1_024, 0.010),
+} satisfies Record<Exclude<BuiltinEmbeddingModel, 'mock'>, ReturnType<typeof embedding>>;
+export const embeddingModelCatalog = deepFreeze(Object.fromEntries(
+  Object.entries(embeddingDefinitions).map(([id, { definition }]) => [id, definition]),
+) as Record<Exclude<BuiltinEmbeddingModel, 'mock'>, EmbeddingModelDefinition>);
+
+for (const [id, { pricing }] of Object.entries(embeddingDefinitions)) priceDefinitions[id as ModelId] = pricing;
+export const defaultPricing: Readonly<Record<ModelId, PricingEntry>> = deepFreeze({ ...priceDefinitions, ...qwenPriceDefinitions });

@@ -1,7 +1,7 @@
 import type { ProviderOptions } from './types.js';
 import { APICallError, generateText, streamText, Output, NoObjectGeneratedError, type ModelMessage, type ToolSet, type LanguageModelUsage } from 'ai';
 import { z } from 'zod';
-import { defaultPricing, imageModelCatalog, modelCatalog } from './catalog.js';
+import { defaultPricing, embeddingModelCatalog, imageModelCatalog, modelCatalog } from './catalog.js';
 import { Ledger, normalizeUsage } from './accounting.js';
 import { Budget, classify, defaultRetryPolicy, EventQueue } from './execution.js';
 import { LlmError, invalidConfiguration } from './errors.js';
@@ -9,6 +9,8 @@ import { resolvePricing } from './pricing.js';
 import { capabilityReasons, defaultsSchema, inputFiles, validateImageModel, validateModel, validateRequest } from './validation.js';
 import type { ClientLanguageModels, ClientImageModels, Accounting, ImageModelDefinition, ImageRequest, ImageResult, LlmClientOptions, LlmRequest, LlmResult, LlmStream, LlmStreamEvent, ModelDefinition, ModelId, ObjectOutput, ProviderAdapter, RequestDefaults, RetryPolicy } from './types.js';
 import { executeImages } from './images.js';
+import { executeEmbeddings, validateEmbeddingModel } from './embeddings.js';
+import type { ClientEmbeddingModels, EmbeddingManyRequest, EmbeddingManyResult, EmbeddingModelDefinition, EmbeddingProviderAdapter, EmbeddingRequest, EmbeddingResult } from './types.js';
 import { outputDiagnostics, supportsStrictOpenAI } from './structured-output.js';
 import type { StructuredOutputDiagnostics } from './types.js';
 
@@ -16,6 +18,8 @@ export class LlmClient<const O extends LlmClientOptions = LlmClientOptions> {
   private providers = new Map<string, ProviderAdapter>();
   private models = new Map<ModelId, ModelDefinition>();
   private imageModels = new Map<ModelId, ImageModelDefinition>();
+  private embeddingModels = new Map<ModelId, EmbeddingModelDefinition>();
+  private embeddingProviders = new Map<string, EmbeddingProviderAdapter>();
   private readonly pricing;
   private readonly defaults: RequestDefaults;
   private readonly retries: RetryPolicy;
@@ -33,15 +37,33 @@ export class LlmClient<const O extends LlmClientOptions = LlmClientOptions> {
     if (typeof this.mock.text !== 'string') invalidConfiguration();
     for (const [id, def] of Object.entries(modelCatalog)) this.models.set(id as ModelId, structuredClone(def));
     for (const [id, def] of Object.entries(imageModelCatalog)) this.imageModels.set(id as ModelId, structuredClone(def));
-    for (const adapter of options.providers as readonly ProviderAdapter[]) {
-      if (!adapter || !/^[\w.-]+$/.test(adapter.id) || adapter.id === 'mock' || this.providers.has(adapter.id) || typeof adapter.resolveModel !== 'function') invalidConfiguration();
-      // Capture functions and data so later property assignment cannot change the client.
-      this.providers.set(adapter.id, { ...adapter, models: undefined, imageModels: undefined });
-      for (const [id, def] of Object.entries(adapter.models ?? {})) this.models.set(`${adapter.id}:${id}`, structuredClone(def));
-      for (const [id, def] of Object.entries(adapter.imageModels ?? {})) this.imageModels.set(`${adapter.id}:${id}`, structuredClone(def));
+    for (const [id, def] of Object.entries(embeddingModelCatalog)) this.embeddingModels.set(id as ModelId, structuredClone(def));
+    for (const adapter of options.providers as LlmClientOptions['providers']) {
+      if (!adapter || !/^[\w.-]+$/.test(adapter.id) || adapter.id === 'mock' || this.providers.has(adapter.id) || this.embeddingProviders.has(adapter.id)) invalidConfiguration();
+      if ('resolveModel' in adapter) {
+        if (typeof adapter.resolveModel !== 'function') invalidConfiguration();
+        // Capture functions and data so later property assignment cannot change the client.
+        this.providers.set(adapter.id, { ...adapter, models: undefined, imageModels: undefined, embeddingModels: undefined });
+        for (const [id, def] of Object.entries(adapter.models ?? {})) this.models.set(`${adapter.id}:${id}`, structuredClone(def));
+        for (const [id, def] of Object.entries(adapter.imageModels ?? {})) this.imageModels.set(`${adapter.id}:${id}`, structuredClone(def));
+      } else if (typeof adapter.embedText !== 'function') invalidConfiguration();
+      if (adapter.embedText !== undefined || adapter.embeddingModels !== undefined) {
+        if (typeof adapter.embedText !== 'function') invalidConfiguration();
+        this.embeddingProviders.set(adapter.id, { ...adapter, embedText: adapter.embedText, embeddingModels: undefined });
+        for (const [id, def] of Object.entries(adapter.embeddingModels ?? {})) {
+          if (!id) invalidConfiguration();
+          validateEmbeddingModel(def);
+          this.embeddingModels.set(`${adapter.id}:${id}`, structuredClone(def));
+        }
+      }
     }
     for (const [id, def] of Object.entries(options.models ?? {})) { if (!/^[^:]+:.+$/.test(id) || !def) invalidConfiguration(); this.models.set(id as ModelId, structuredClone(def)); }
     for (const [id, def] of Object.entries(options.imageModels ?? {})) { if (!/^[^:]+:.+$/.test(id) || !def) invalidConfiguration(); this.imageModels.set(id as ModelId, structuredClone(def)); }
+    for (const [id, def] of Object.entries(options.embeddingModels ?? {})) {
+      if (!/^[^:]+:.+$/.test(id) || !def) invalidConfiguration();
+      validateEmbeddingModel(def);
+      this.embeddingModels.set(id as ModelId, structuredClone(def));
+    }
     for (const def of this.models.values()) validateModel(def);
     for (const def of this.imageModels.values()) validateImageModel(def);
   }
@@ -64,6 +86,26 @@ export class LlmClient<const O extends LlmClientOptions = LlmClientOptions> {
   }
   async generateImage(input: ImageRequest<ClientImageModels<O>>): Promise<ImageResult> {
     return executeImages(input, { providers: this.providers, models: this.imageModels, pricing: this.pricing, retries: this.retries, fetch: this.transport });
+  }
+  listEmbeddingModels() {
+    return [...this.embeddingModels].map(([model, definition]) => ({
+      model, configured: this.embeddingProviders.has(model.split(':')[0]!), definition: structuredClone(definition),
+    }));
+  }
+  async embed(input: EmbeddingRequest<ClientEmbeddingModels<O>>): Promise<EmbeddingResult> {
+    if (!input || typeof input !== 'object' || 'values' in input) throw new LlmError('INVALID_REQUEST');
+    const { value, ...options } = input;
+    const { embeddings, ...result } = await this.runEmbeddings({ ...options, values: [value] }, 'embed');
+    return { ...result, embedding: embeddings[0]! };
+  }
+  async embedMany(input: EmbeddingManyRequest<ClientEmbeddingModels<O>>): Promise<EmbeddingManyResult> {
+    return this.runEmbeddings(input, 'embedMany');
+  }
+  private runEmbeddings(input: EmbeddingManyRequest<ModelId | 'mock'>, operation: 'embed' | 'embedMany') {
+    return executeEmbeddings(input, operation, {
+      providers: this.embeddingProviders, models: this.embeddingModels, pricing: this.pricing,
+      retries: this.retries, timeoutMs: this.defaults.timeoutMs, fetch: this.transport,
+    });
   }
   private prepare(input: LlmRequest<ModelId | 'mock'>, object: boolean, streaming: boolean) {
     const request: LlmRequest<ModelId | 'mock'> = { maxOutputTokens: 4096, timeoutMs: 60_000, maxSteps: 5, ...this.defaults, ...input };
@@ -107,7 +149,7 @@ export class LlmClient<const O extends LlmClientOptions = LlmClientOptions> {
         return { ...mockAccounting(), model: 'mock', provider: 'mock', text, finishReason: 'stop', messages: [{ role: 'assistant', content: text }], toolCalls: [], toolResults: [], ...(output ? { object: output.schema.parse(data) } : {}) };
       }
       const model = adapter!.resolveModel(modelId!, { fetch: this.transport });
-      const mapped = adapter!.resolveOptions?.(modelId!, request.reasoning, definition!.capabilities) ?? {};
+      const mapped = adapter!.resolveOptions?.(modelId!, request.reasoning, definition!.capabilities, { structuredOutput: !!output, streaming: !!queue }) ?? {};
       if (request.reasoning && !adapter!.resolveOptions) throw new LlmError('UNSUPPORTED_CAPABILITY');
       // Canonical reasoning settings take precedence over the escape hatch.
       const providerOptions: ProviderOptions = { ...request.providerOptions };

@@ -1,12 +1,12 @@
 ---
 name: llmclient
-description: Integrate or troubleshoot @baiq-bq/llmclient in a Node.js backend. Use when choosing an adapter or model, generating text, structured data or images, streaming, or tracking usage and cost.
+description: Integrate or troubleshoot @baiq-bq/llmclient in a Node.js backend. Use when choosing an adapter or model, generating text, structured data or images, embedding text, streaming, or tracking usage and cost.
 ---
 
 # Use llmclient
 
 - Use Node.js 24 or newer. Install only the SDK for each provider the application imports. See [models and adapters](references/models.md) and the [installation commands](https://github.com/baiq-bq/llmclient#install-and-run) for npm, pnpm, Yarn and Bun.
-- Select a `LanguageModel` for text, structured output and streaming, or an `ImageModel` for image generation and editing. Check `client.listModels()` for capabilities and configuration. Provider access still depends on the account.
+- Select a `LanguageModel` for text, structured output and streaming, or an `ImageModel` for image generation and editing. Check `client.listModels()` for capabilities and configuration. Use `EmbeddingModel` and `client.listEmbeddingModels()` for text embeddings. Provider access still depends on the account.
 - Pass provider credentials explicitly from the application's secret configuration. Use `mock` for examples and tests that do not require a live provider.
 - Preserve `usage`, `cost` and `entries` separately from visible output. A partial amount is a subtotal, and an unknown amount is not zero.
 
@@ -50,6 +50,7 @@ console.log(result.object, result.cost);
 
 - For structured streaming, pass the same output definition to `client.stream(request, output)`. Consume `events` and await `result`. Partial objects are provisional.
 - Pass file bytes and their MIME types. On `UNSUPPORTED_CAPABILITY`, read `error.details.reasons` and `validModels`, then choose a compatible model only if the requested model is flexible.
+- Use `embed({ model, value })` for one input and `embedMany({ model, values })` for several. Match dimensions and embedding space between documents and queries. Use `EmbeddingModel.Mock` for deterministic offline vectors. [Embeddings setup and pricing](https://github.com/baiq-bq/llmclient#text-embeddings)
 - Use `generateImage` with an image model and write its returned bytes. Check the provider's supported size or aspect ratio and supply pricing overrides where needed.
 - Configure retries on client construction. Use `maxRetries: 0` for a single attempt. Pass a request `timeoutMs` and an `AbortSignal` as needed. Before retrying in application code, consider any tool effects or output that callers have already received.
 - Consult the package README for advanced usage, configuration limits and pricing. [GitHub documentation](https://github.com/baiq-bq/llmclient#readme)

@@ -1,4 +1,4 @@
-import type { BuiltinLanguageModel, BuiltinImageModel } from './models.js';
+import type { BuiltinLanguageModel, BuiltinImageModel, BuiltinEmbeddingModel } from './models.js';
 import type { generateText } from 'ai';
 export type ProviderOptions = NonNullable<Parameters<typeof generateText>[0]['providerOptions']>;
 import type { ImageModel, LanguageModel, ModelMessage, ToolSet, TextStreamPart, LanguageModelUsage } from 'ai';
@@ -10,26 +10,29 @@ export interface ModelCapabilities {
   images: boolean;
   files?: FileCapabilities;
   structuredOutput: boolean;
+  structuredOutputWithReasoning?: boolean;
   tools: boolean;
   streaming: boolean;
   temperature?: { max: number; withReasoning: boolean };
-  reasoning?: { mode: 'effort' | 'adaptive' | 'budget' | 'level'; efforts: readonly Reasoning['effort'][]; budgetRange?: readonly [number, number] };
+  reasoning?: { mode: 'effort' | 'adaptive' | 'budget' | 'level'; efforts: readonly Reasoning['effort'][]; budgetRange?: readonly [number, number]; streamOnly?: boolean; budgetSharesOutputLimit?: boolean };
   maxOutputTokens: number;
 }
 export interface ModelDefinition {
   capabilities: ModelCapabilities;
   /** Documentation used to verify capabilities. */
   source?: string;
+  status?: 'stable' | 'preview' | 'restricted' | 'legacy' | 'deprecated';
+  retirementDate?: string;
 }
 export interface AdapterContext { fetch?: typeof fetch }
 /** An external adapter may wrap any SDK model, including a custom LanguageModel implementation. */
-export interface ProviderAdapter {
+export interface ProviderAdapter extends Partial<Pick<EmbeddingProviderAdapter, 'embeddingModels' | 'embedText'>> {
   id: string;
   models?: Record<string, ModelDefinition>;
   imageModels?: Record<string, ImageModelDefinition>;
   resolveImageModel?(modelId: string, context: AdapterContext): ImageModel;
   resolveModel(modelId: string, context: AdapterContext): LanguageModel;
-  resolveOptions?(modelId: string, reasoning: Reasoning | undefined, capabilities: ModelCapabilities): ProviderOptions;
+  resolveOptions?(modelId: string, reasoning: Reasoning | undefined, capabilities: ModelCapabilities, operation: { structuredOutput: boolean; streaming: boolean }): ProviderOptions;
   normalizeUsage?(usage: LanguageModelUsage): Usage;
 }
 export interface Rates {
@@ -45,12 +48,16 @@ export interface Rates {
 export interface PricingEntry {
   rates: Rates;
   longContext?: { minimumInputTokens: number; rates: Rates };
+  contextTiers?: readonly { minimumInputTokens: number; rates: Rates }[];
+  /** Treat a cache hit as unpriced when the public cache rate is unavailable. */
+  cachedInputFallback?: false;
   source?: string;
   version?: string;
 }
 export interface PricingOverride {
   rates?: Rates;
   longContext?: { minimumInputTokens?: number; rates?: Rates } | null;
+  contextTiers?: PricingEntry['contextTiers'] | null;
   source?: string;
   version?: string;
 }
@@ -131,9 +138,10 @@ export interface RequestDefaults {
   reasoning?: Reasoning;
 }
 export interface LlmClientOptions {
-  providers: readonly ProviderAdapter[];
+  providers: readonly (ProviderAdapter | EmbeddingProviderAdapter)[];
   models?: Partial<Record<ModelId, ModelDefinition>>;
   imageModels?: Partial<Record<ModelId, ImageModelDefinition>>;
+  embeddingModels?: Partial<Record<ModelId, EmbeddingModelDefinition>>;
   pricing?: PricingTable;
   defaults?: RequestDefaults;
   retries?: Partial<RetryPolicy>;
@@ -195,16 +203,58 @@ export interface ImageResult extends Accounting {
   provider: string;
   images: { bytes: Uint8Array; mediaType: string }[];
 }
+
+export interface EmbeddingModelDefinition {
+  maxInputTokens: number;
+  maxBatchSize: number;
+  /** Conservative byte budget for grouping multiple texts in one call. */
+  maxBatchBytes?: number;
+  defaultDimensions?: number;
+  dimensions?: { min: number; max: number } | readonly number[];
+  inputType?: boolean;
+  status?: 'stable' | 'legacy' | 'deprecated';
+  retirementDate?: string;
+  source?: string;
+}
+export interface EmbeddingModelOptions {
+  dimensions?: number;
+  inputType?: 'query' | 'document';
+}
+export interface EmbeddingProviderAdapter {
+  id: string;
+  embeddingModels?: Record<string, EmbeddingModelDefinition>;
+  /** Embed one transport batch. Vectors must follow input order. */
+  embedText(modelId: string, request: EmbeddingModelOptions & { values: string[]; signal: AbortSignal }, context: AdapterContext): Promise<{ embeddings: number[][]; inputTokens?: number }>;
+}
+interface EmbeddingRequestOptions<M> extends EmbeddingModelOptions {
+  model: M;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+export interface EmbeddingRequest<M extends ModelId | 'mock' = BuiltinEmbeddingModel> extends EmbeddingRequestOptions<M> {
+  value: string;
+}
+export interface EmbeddingManyRequest<M extends ModelId | 'mock' = BuiltinEmbeddingModel> extends EmbeddingRequestOptions<M> {
+  values: readonly string[];
+}
+interface EmbeddingAccounting extends Accounting {
+  model: ModelId | 'mock';
+  provider: string;
+  dimensions: number;
+}
+export interface EmbeddingResult extends EmbeddingAccounting { embedding: number[] }
+export interface EmbeddingManyResult extends EmbeddingAccounting { embeddings: number[][] }
 export interface CompatibilityDetails {
   model: ModelId | 'mock';
-  operation: 'generate' | 'generateObject' | 'stream' | 'generateImage';
+  operation: 'generate' | 'generateObject' | 'stream' | 'generateImage' | 'embed' | 'embedMany';
   reasons: string[];
   validModels: { model: ModelId; configured: boolean }[];
 }
 
 type LiteralKeys<T> = string extends keyof T ? never : Extract<keyof T, string>;
-type AdapterModels<A, K extends 'models' | 'imageModels'> = A extends { id: infer Id extends string } ? string extends Id ? never : K extends keyof A ? `${Id}:${LiteralKeys<NonNullable<A[K]>>}` : never : never;
+type AdapterModels<A, K extends 'models' | 'imageModels' | 'embeddingModels'> = A extends { id: infer Id extends string } ? string extends Id ? never : K extends keyof A ? `${Id}:${LiteralKeys<NonNullable<A[K]>>}` : never : never;
 export type ClientLanguageModels<O extends LlmClientOptions> = BuiltinLanguageModel | Extract<LiteralKeys<NonNullable<O['models']>>, ModelId> | AdapterModels<O['providers'][number], 'models'>;
 export type ClientImageModels<O extends LlmClientOptions> = BuiltinImageModel | Extract<LiteralKeys<NonNullable<O['imageModels']>>, ModelId> | AdapterModels<O['providers'][number], 'imageModels'>;
+export type ClientEmbeddingModels<O extends LlmClientOptions> = BuiltinEmbeddingModel | Extract<LiteralKeys<NonNullable<O['embeddingModels']>>, ModelId> | AdapterModels<O['providers'][number], 'embeddingModels'>;
 /** Preserve literal adapter IDs and model keys so createLlmClient can infer custom model identifiers. */
-export function defineProvider<const A extends ProviderAdapter>(adapter: A): A { return adapter; }
+export function defineProvider<const A extends ProviderAdapter | EmbeddingProviderAdapter>(adapter: A): A { return adapter; }

@@ -1,6 +1,6 @@
 {
   "name": "@baiq/llmclient",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "Configurable multi-provider LLM client with usage accounting, pricing overrides, tools and streaming",
   "license": "MIT",
   "author": {
@@ -96,6 +96,36 @@
         "types": "./dist/providers/kimi.d.cts",
         "default": "./dist/providers/kimi.cjs"
       }
+    },
+    "./providers/voyage": {
+      "import": {
+        "types": "./dist/providers/voyage.d.ts",
+        "default": "./dist/providers/voyage.js"
+      },
+      "require": {
+        "types": "./dist/providers/voyage.d.cts",
+        "default": "./dist/providers/voyage.cjs"
+      }
+    },
+    "./providers/deepinfra": {
+      "import": {
+        "types": "./dist/providers/deepinfra.d.ts",
+        "default": "./dist/providers/deepinfra.js"
+      },
+      "require": {
+        "types": "./dist/providers/deepinfra.d.cts",
+        "default": "./dist/providers/deepinfra.cjs"
+      }
+    },
+    "./providers/qwen": {
+      "import": {
+        "types": "./dist/providers/qwen.d.ts",
+        "default": "./dist/providers/qwen.js"
+      },
+      "require": {
+        "types": "./dist/providers/qwen.d.cts",
+        "default": "./dist/providers/qwen.cjs"
+      }
     }
   },
   "publishConfig": {
@@ -113,16 +143,17 @@
     "check:release": "node scripts/check-release.mjs"
   },
   "dependencies": {
-    "ai": "7.0.154",
-    "zod": "^4.1.8"
+    "ai": "7.0.180",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
+    "@ai-sdk/alibaba": "^2.0.93",
     "@ai-sdk/anthropic": "^4.0.71",
     "@ai-sdk/deepseek": "^3.0.74",
     "@ai-sdk/google": "^4.0.87",
+    "@ai-sdk/moonshotai": "^3.0.79",
     "@ai-sdk/openai": "^4.0.83",
-    "@ai-sdk/xai": "^5.0.14",
-    "@ai-sdk/moonshotai": "^3.0.79"
+    "@ai-sdk/xai": "^5.0.14"
   },
   "peerDependenciesMeta": {
     "@ai-sdk/openai": {
@@ -142,9 +173,13 @@
     },
     "@ai-sdk/moonshotai": {
       "optional": true
+    },
+    "@ai-sdk/alibaba": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@ai-sdk/alibaba": "2.0.93",
     "@ai-sdk/anthropic": "4.0.71",
     "@ai-sdk/deepseek": "3.0.74",
     "@ai-sdk/google": "4.0.87",

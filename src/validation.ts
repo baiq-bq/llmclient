@@ -10,9 +10,9 @@ export const defaultsSchema = z.object({
 }).strict();
 const filesSchema = z.object({ mediaTypes: z.array(z.string().regex(/^[\w.+-]+\/[\w.+-]+$/)).min(1), maxFileBytes: z.number().int().positive(), maxTotalBytes: z.number().int().positive(), maxFiles: z.number().int().positive() }).strict();
 const capabilitiesSchema = z.object({
-  images: z.boolean(), files: filesSchema.optional(), structuredOutput: z.boolean(), tools: z.boolean(), streaming: z.boolean(),
+  images: z.boolean(), files: filesSchema.optional(), structuredOutput: z.boolean(), structuredOutputWithReasoning: z.boolean().optional(), tools: z.boolean(), streaming: z.boolean(),
   temperature: z.object({ max: z.number().finite().nonnegative(), withReasoning: z.boolean() }).strict().optional(),
-  reasoning: z.object({ mode: z.enum(['effort', 'adaptive', 'budget', 'level']), efforts: z.array(reasoningSchema.shape.effort).min(1), budgetRange: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional() }).strict().optional(),
+  reasoning: z.object({ mode: z.enum(['effort', 'adaptive', 'budget', 'level']), efforts: z.array(reasoningSchema.shape.effort).min(1), budgetRange: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional(), streamOnly: z.boolean().optional(), budgetSharesOutputLimit: z.boolean().optional() }).strict().optional(),
   maxOutputTokens: z.number().int().positive(),
 }).strict();
 export function validateModel(def: ModelDefinition) { if (!capabilitiesSchema.safeParse(def?.capabilities).success) invalidConfiguration(); }
@@ -74,10 +74,12 @@ export function capabilityReasons(input: LlmRequest<ModelId | 'mock'>, caps: Mod
   if (input.reasoning) {
     const r = input.reasoning; const c = caps.reasoning;
     if (!c || !c.efforts.includes(r.effort)) reasons.push('reasoning_not_supported');
+    if (r.effort !== 'none' && c?.streamOnly && !streaming) reasons.push('reasoning_requires_streaming');
+    if (r.effort !== 'none' && object && caps.structuredOutputWithReasoning === false) reasons.push('structured_output_requires_no_reasoning');
     const budget = r.effort === 'none' ? 0 : r.budgetTokens ?? ({ minimal: 1024, low: 1024, medium: 4096, high: 16_384, xhigh: 32_768, max: 32_768 }[r.effort]);
     if (r.budgetTokens !== undefined && (c?.mode !== 'budget' || r.effort === 'none')) reasons.push('reasoning_budget_not_supported');
     if (c?.mode === 'budget' && r.effort !== 'none' && (!c.budgetRange || budget < c.budgetRange[0] || budget > c.budgetRange[1])) reasons.push('reasoning_budget_out_of_range');
-    if (c?.mode === 'budget' && r.effort !== 'none' && (input.model?.startsWith('anthropic:') ? input.maxOutputTokens! + budget > caps.maxOutputTokens : budget >= input.maxOutputTokens!)) reasons.push('reasoning_output_limit_exceeded');
+    if (c?.mode === 'budget' && c.budgetSharesOutputLimit !== false && r.effort !== 'none' && (input.model?.startsWith('anthropic:') ? input.maxOutputTokens! + budget > caps.maxOutputTokens : budget >= input.maxOutputTokens!)) reasons.push('reasoning_output_limit_exceeded');
   }
   return reasons;
 }

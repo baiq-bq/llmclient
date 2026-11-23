@@ -4,6 +4,7 @@ import { normalizeUsage } from '../accounting.js';
 import { invalidConfiguration } from '../errors.js';
 import type { ModelCapabilities, ModelDefinition, Reasoning } from '../types.js';
 import { modelCatalog } from '../catalog.js';
+import { reasoningBudget } from '../validation.js';
 
 export interface ProviderSettings { apiKey: string; baseURL?: string; headers?: Record<string, string>; fetch?: typeof fetch; }
 export function settings(input: ProviderSettings): ProviderSettings {
@@ -15,9 +16,6 @@ export function settings(input: ProviderSettings): ProviderSettings {
 }
 export function providerModels(id: string): Record<string, ModelDefinition> {
   return Object.fromEntries(Object.entries(modelCatalog).filter(([key]) => key.startsWith(`${id}:`)).map(([key, value]) => [key.slice(id.length + 1), structuredClone(value)]));
-}
-export function reasoningBudget(reasoning: Reasoning): number {
-  return reasoning.effort === 'none' ? 0 : reasoning.budgetTokens ?? ({ minimal: 1024, low: 1024, medium: 4096, high: 16_384, xhigh: 32_768, max: 32_768 }[reasoning.effort]);
 }
 export function reasoningOptions(id: string, reasoning: Reasoning | undefined, caps: ModelCapabilities): ProviderOptions {
   if (!reasoning) return {};

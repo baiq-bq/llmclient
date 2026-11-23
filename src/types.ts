@@ -14,7 +14,14 @@ export interface ModelCapabilities {
   tools: boolean;
   streaming: boolean;
   temperature?: { max: number; withReasoning: boolean };
-  reasoning?: { mode: 'effort' | 'adaptive' | 'budget' | 'level'; efforts: readonly Reasoning['effort'][]; budgetRange?: readonly [number, number]; streamOnly?: boolean; budgetSharesOutputLimit?: boolean };
+  reasoning?: {
+    mode: 'effort' | 'adaptive' | 'budget' | 'level';
+    efforts: readonly Reasoning['effort'][];
+    budgetRange?: readonly [number, number];
+    streamOnly?: boolean;
+    budgetSharesOutputLimit?: boolean;
+    maxCombinedOutputTokens?: number;
+  };
   maxOutputTokens: number;
 }
 export interface ModelDefinition {

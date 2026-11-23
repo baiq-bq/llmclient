@@ -1,6 +1,12 @@
 import { createAlibaba } from '@ai-sdk/alibaba';
 import type { ProviderAdapter } from '../types.js';
-import { providerModels, reasoningBudget, settings, type ProviderSettings } from './shared.js';
+import { reasoningBudget } from '../validation.js';
+import { providerModels, settings, type ProviderSettings } from './shared.js';
+
+const preserveThinkingModels = new Set([
+  'qwen4-max', 'qwen4-max-preview', 'qwen4.0-max-preview',
+  'qwen3.8-max', 'qwen3.8-max-0902', 'qwen3.8-max-2026-09-02', 'qwen3.8-flash', 'qwen3.8-omni-flash',
+]);
 
 /** Alibaba Cloud Model Studio Chat Completions using DashScope credentials. */
 export function qwenAdapter(input: ProviderSettings): ProviderAdapter {
@@ -13,12 +19,10 @@ export function qwenAdapter(input: ProviderSettings): ProviderAdapter {
       const reasoningDisabled = reasoning?.effort === 'none'
         || (operation.structuredOutput && caps.structuredOutputWithReasoning === false)
         || (!operation.streaming && caps.reasoning?.streamOnly);
-      const preserveThinking = /^(qwen4(?:\.0)?-max|qwen3\.8-omni-flash)$/.test(id)
-        || id === 'qwen4-max-preview' || id === 'qwen4.0-max-preview' || id === 'qwen3.8-max-2026-09-02';
       const alibaba = {
         ...(reasoningDisabled ? { enableThinking: false, thinkingBudget: undefined }
           : reasoning ? { enableThinking: caps.reasoning?.efforts.includes('none') ? true : undefined, thinkingBudget: reasoningBudget(reasoning) } : {}),
-        ...(preserveThinking ? { preserveThinking: true } : {}),
+        ...(preserveThinkingModels.has(id) ? { preserveThinking: true } : {}),
       };
       return { alibaba };
     },

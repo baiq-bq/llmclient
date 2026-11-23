@@ -1,7 +1,7 @@
 import { modelMessageSchema } from 'ai';
 import { z } from 'zod';
 import { invalidConfiguration, LlmError } from './errors.js';
-import type { FileCapabilities, ImageModelDefinition, InputFile, LlmRequest, ModelId, ModelCapabilities, ModelDefinition } from './types.js';
+import type { FileCapabilities, ImageModelDefinition, InputFile, LlmRequest, ModelId, ModelCapabilities, ModelDefinition, Reasoning } from './types.js';
 
 export const reasoningSchema = z.object({ effort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']), budgetTokens: z.number().int().positive().optional() }).strict();
 export const defaultsSchema = z.object({
@@ -12,7 +12,7 @@ const filesSchema = z.object({ mediaTypes: z.array(z.string().regex(/^[\w.+-]+\/
 const capabilitiesSchema = z.object({
   images: z.boolean(), files: filesSchema.optional(), structuredOutput: z.boolean(), structuredOutputWithReasoning: z.boolean().optional(), tools: z.boolean(), streaming: z.boolean(),
   temperature: z.object({ max: z.number().finite().nonnegative(), withReasoning: z.boolean() }).strict().optional(),
-  reasoning: z.object({ mode: z.enum(['effort', 'adaptive', 'budget', 'level']), efforts: z.array(reasoningSchema.shape.effort).min(1), budgetRange: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional(), streamOnly: z.boolean().optional(), budgetSharesOutputLimit: z.boolean().optional() }).strict().optional(),
+  reasoning: z.object({ mode: z.enum(['effort', 'adaptive', 'budget', 'level']), efforts: z.array(reasoningSchema.shape.effort).min(1), budgetRange: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional(), streamOnly: z.boolean().optional(), budgetSharesOutputLimit: z.boolean().optional(), maxCombinedOutputTokens: z.number().int().positive().optional() }).strict().optional(),
   maxOutputTokens: z.number().int().positive(),
 }).strict();
 export function validateModel(def: ModelDefinition) { if (!capabilitiesSchema.safeParse(def?.capabilities).success) invalidConfiguration(); }
@@ -63,20 +63,32 @@ export function fileReasons(files: readonly InputFile[], caps: FileCapabilities 
   if (files.length > caps.maxFiles) reasons.push('too_many_files');
   return reasons;
 }
+export function reasoningBudget(reasoning: Reasoning): number {
+  return reasoning.effort === 'none' ? 0 : reasoning.budgetTokens ?? ({ minimal: 1024, low: 1024, medium: 4096, high: 16_384, xhigh: 32_768, max: 32_768 }[reasoning.effort]);
+}
+export function withOutputLimit(
+  input: LlmRequest<ModelId | 'mock'>, caps: ModelCapabilities | undefined, explicitLimit: number | undefined,
+): LlmRequest<ModelId | 'mock'> {
+  const combinedLimit = caps?.reasoning?.maxCombinedOutputTokens;
+  const extra = combinedLimit && input.reasoning?.effort !== undefined && input.reasoning.effort !== 'none' ? reasoningBudget(input.reasoning) : 0;
+  return { ...input, maxOutputTokens: explicitLimit ?? Math.min(combinedLimit ?? Infinity, 4096 + extra) };
+}
 export function capabilityReasons(input: LlmRequest<ModelId | 'mock'>, caps: ModelCapabilities, files: InputFile[], object: boolean, streaming: boolean): string[] {
   const reasons = fileReasons(files, caps.files);
   if (files.some(f => f.mediaType.startsWith('image/')) && !caps.images) reasons.push('images_not_supported');
   if (object && !caps.structuredOutput) reasons.push('structured_output_not_supported');
   if (streaming && !caps.streaming) reasons.push('streaming_not_supported');
   if (input.tools && Object.keys(input.tools).length && !caps.tools) reasons.push('tools_not_supported');
-  if (input.maxOutputTokens! > caps.maxOutputTokens) reasons.push('output_limit_exceeded');
+  const reasoningEnabled = input.reasoning && input.reasoning.effort !== 'none';
+  const maxOutputTokens = (reasoningEnabled ? caps.reasoning?.maxCombinedOutputTokens : undefined) ?? caps.maxOutputTokens;
+  if (input.maxOutputTokens! > maxOutputTokens) reasons.push('output_limit_exceeded');
   if (input.temperature !== undefined && (!caps.temperature || input.temperature > caps.temperature.max || (!!input.reasoning && input.reasoning.effort !== 'none' && !caps.temperature.withReasoning))) reasons.push('temperature_not_supported');
   if (input.reasoning) {
     const r = input.reasoning; const c = caps.reasoning;
     if (!c || !c.efforts.includes(r.effort)) reasons.push('reasoning_not_supported');
     if (r.effort !== 'none' && c?.streamOnly && !streaming) reasons.push('reasoning_requires_streaming');
     if (r.effort !== 'none' && object && caps.structuredOutputWithReasoning === false) reasons.push('structured_output_requires_no_reasoning');
-    const budget = r.effort === 'none' ? 0 : r.budgetTokens ?? ({ minimal: 1024, low: 1024, medium: 4096, high: 16_384, xhigh: 32_768, max: 32_768 }[r.effort]);
+    const budget = reasoningBudget(r);
     if (r.budgetTokens !== undefined && (c?.mode !== 'budget' || r.effort === 'none')) reasons.push('reasoning_budget_not_supported');
     if (c?.mode === 'budget' && r.effort !== 'none' && (!c.budgetRange || budget < c.budgetRange[0] || budget > c.budgetRange[1])) reasons.push('reasoning_budget_out_of_range');
     if (c?.mode === 'budget' && c.budgetSharesOutputLimit !== false && r.effort !== 'none' && (input.model?.startsWith('anthropic:') ? input.maxOutputTokens! + budget > caps.maxOutputTokens : budget >= input.maxOutputTokens!)) reasons.push('reasoning_output_limit_exceeded');

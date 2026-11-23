@@ -6,7 +6,7 @@ import { Ledger, normalizeUsage } from './accounting.js';
 import { Budget, classify, defaultRetryPolicy, EventQueue } from './execution.js';
 import { LlmError, invalidConfiguration } from './errors.js';
 import { resolvePricing } from './pricing.js';
-import { capabilityReasons, defaultsSchema, inputFiles, validateImageModel, validateModel, validateRequest } from './validation.js';
+import { capabilityReasons, defaultsSchema, inputFiles, validateImageModel, validateModel, validateRequest, withOutputLimit } from './validation.js';
 import type { ClientLanguageModels, ClientImageModels, Accounting, ImageModelDefinition, ImageRequest, ImageResult, LlmClientOptions, LlmRequest, LlmResult, LlmStream, LlmStreamEvent, ModelDefinition, ModelId, ObjectOutput, ProviderAdapter, RequestDefaults, RetryPolicy } from './types.js';
 import { executeImages } from './images.js';
 import { executeEmbeddings, validateEmbeddingModel } from './embeddings.js';
@@ -108,15 +108,19 @@ export class LlmClient<const O extends LlmClientOptions = LlmClientOptions> {
     });
   }
   private prepare(input: LlmRequest<ModelId | 'mock'>, object: boolean, streaming: boolean) {
-    const request: LlmRequest<ModelId | 'mock'> = { maxOutputTokens: 4096, timeoutMs: 60_000, maxSteps: 5, ...this.defaults, ...input };
-    validateRequest(request);
+    const merged: LlmRequest<ModelId | 'mock'> = { timeoutMs: 60_000, maxSteps: 5, ...this.defaults, ...input };
+    validateRequest(merged);
+    const explicitOutputLimit = input.maxOutputTokens ?? this.defaults.maxOutputTokens;
+    const definition = merged.model && merged.model !== 'mock' ? this.models.get(merged.model) : undefined;
+    const request = withOutputLimit(merged, definition?.capabilities, explicitOutputLimit);
     const files = inputFiles(request);
     if (request.model === 'mock') return { request, files };
     if (!request.model) throw new LlmError('INVALID_REQUEST');
-    const definition = this.models.get(request.model);
     const reasons = definition ? capabilityReasons(request, definition.capabilities, files, object, streaming) : ['unknown_model'];
     if (reasons.length) {
-      const validModels = [...this.models].filter(([model, def]) => !capabilityReasons({ ...request, model }, def.capabilities, files, object, streaming).length).map(([model]) => ({ model, configured: this.providers.has(model.split(':')[0]!) }));
+      const validModels = [...this.models].filter(([model, def]) => !capabilityReasons(
+        withOutputLimit({ ...merged, model }, def.capabilities, explicitOutputLimit), def.capabilities, files, object, streaming,
+      ).length).map(([model]) => ({ model, configured: this.providers.has(model.split(':')[0]!) }));
       throw new LlmError('UNSUPPORTED_CAPABILITY', { details: { model: request.model, operation: streaming ? 'stream' : object ? 'generateObject' : 'generate', reasons, validModels } });
     }
     const providerId = request.model.slice(0, request.model.indexOf(':'));

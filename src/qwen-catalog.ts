@@ -18,7 +18,9 @@ const fileLimits = {
 } as const;
 const vision = { images: true, files: fileLimits };
 const noThinkingForObjects = { structuredOutputWithReasoning: false };
-const modernVision = { ...vision, maxOutputTokens: 131_072, reasoning: budget(262_144, { budgetSharesOutputLimit: true }) };
+const modernVision = { ...vision, maxOutputTokens: 131_072, reasoning: budget(262_144) };
+const qwen4 = { ...modernVision, reasoning: budget(262_143, { budgetSharesOutputLimit: true, maxCombinedOutputTokens: 262_144 }) };
+const qwen4Preview = { ...modernVision, reasoning: budget(262_144, { budgetSharesOutputLimit: true, maxCombinedOutputTokens: 393_216 }) };
 const legacyVision = { ...vision, ...noThinkingForObjects, maxOutputTokens: 32_768, reasoning: budget(81_920) };
 const openWeightVision = { ...legacyVision, reasoning: budget(81_920, { streamOnly: true }) };
 
@@ -57,15 +59,15 @@ function add(
   }
 }
 
-add(['qwen4-max'], modernVision, standard(1.5, 4.5), { source: qwen4Source, pricingSource: qwen4Source });
-add(['qwen4-max-preview', 'qwen4.0-max-preview'], modernVision, {}, {
+add(['qwen4-max'], qwen4, standard(1.5, 4.5), { source: qwen4Source, pricingSource: qwen4Source });
+add(['qwen4-max-preview', 'qwen4.0-max-preview'], qwen4Preview, {}, {
   source: previewSource, pricingSource: previewSource, status: 'restricted', retirementDate: '2026-11-25',
 });
 add(['qwen3.8-max', 'qwen3.8-max-0902', 'qwen3.8-max-2026-09-02'], modernVision, standard(2, 6), {
   source: 'https://www.alibabacloud.com/help/en/model-studio/qwen3-8-max',
 });
 add(['qwen3.8-flash'], modernVision, standard(0.15, 0.47));
-add(['qwen3.8-2.4t-a95b'], { ...modernVision, reasoning: budget(262_144, { efforts, budgetSharesOutputLimit: true }) }, standard(2, 6));
+add(['qwen3.8-2.4t-a95b'], { ...modernVision, reasoning: budget(262_144, { efforts }) }, standard(2, 6));
 add(['qwen3.8-27b'], modernVision, standard(0.5, 3));
 add(['qwen3.8-omni-flash'], { ...modernVision, maxOutputTokens: 32_768 }, {}, {
   source: 'https://www.alibabacloud.com/help/en/model-studio/qwen3-8-omni-flash',
